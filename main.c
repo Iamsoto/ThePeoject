@@ -49,7 +49,7 @@ void mountroot()   /* mount root file system */
 	  int ninodes, nblocks, ifree, bfree;
 
 	  printf("enter rootdev name (RETURN for disk) : ");
-	  gets(line);
+	  fgets(line, 64, stdin);
 
 	  rootdev = "disk";
 
@@ -65,6 +65,8 @@ void mountroot()   /* mount root file system */
 	  /* get super block of rootdev */
 	  get_block(dev, 1, buf);
 	  sp = (SUPER *)buf;
+
+	  ninodes = sp->s_inodes_count;
 
 	  /* check magic number */
 	  printf("SUPER magic=0x%x  ", sp->s_magic);
@@ -178,7 +180,7 @@ int search_array(char *function_names[], char *s)
 }
 
 int touch(char *param){}
-int chmod(char *param){}
+int my_chmod(char *param){}
 int chown(char *param){}
 int chgrp(char *param){}
 int ls(char *param){}
@@ -197,7 +199,7 @@ int main(int argc, char *argv[ ])
 	  init();
 	 
 	  char *function_names[] = {"touch", "chmod", "chown", "chgrp", "ls", "cd", 0};
-	  int (*fptr[])() = {touch, chmod, chown, chgrp, ls, cd, 0};
+	  int (*fptr[])() = {touch, my_chmod, chown, chgrp, ls, cd, 0};
 		  
 
 	  while(1){
@@ -212,7 +214,8 @@ int main(int argc, char *argv[ ])
 		memset(parameter,0, 64);
 
 		printf("input command : ");
-		gets(line);
+		
+		fgets(line, 128, stdin);
 		if (line[0]==0) continue;
 
 		sscanf(line, "%s %s %64c", cname, pathname, parameter);

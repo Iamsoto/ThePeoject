@@ -7,6 +7,7 @@
 typedef unsigned int u32;
 
 extern int dev;
+extern int ninodes;
 
 extern MINODE *iget(int dev, int ino);
 extern int get_block(int fd, int blk, char buf[ ]);

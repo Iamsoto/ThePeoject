@@ -1,5 +1,7 @@
 #include "include.h"
 
+int ninodes;
+
 //extern int search(INODE * inodePtr, char * name);
 
 int iput(MINODE *mip)
@@ -71,26 +73,63 @@ MINODE *iget(int dev, int ino)
 	return mip;
 }
 
+int tst_bit(char *buf, int bit)
+{
+  int i, j;
+  i = bit/8; j=bit%8;
+  if (buf[i] & (1 << j))
+     return 1;
+  return 0;
+}
+
+int set_bit(char *buf, int bit)
+{
+  int i, j;
+  i = bit/8; j=bit%8;
+  buf[i] |= (1 << j);
+}
+
+int clr_bit(char *buf, int bit)
+{
+  int i, j;
+  i = bit/8; j=bit%8;
+  buf[i] &= ~(1 << j);
+}	
+
 int ialloc(int dev)
 {
-  int  i;
+	int  i;
+	char buf[BLKSIZE];
+
+	// read inode_bitmap block
+	get_block(dev, bg_inode_table, buf);
+
+	for (i=0; i < ninodes; i++){
+		if (tst_bit(buf, i)==0){
+			set_bit(buf,i);
+			decFreeInodes(dev);
+			put_block(dev, bg_inode_table, buf);
+			return i+1;
+		}
+	}
+	printf("ialloc(): no more free inodes\n");
+	return 0;
+}
+
+int decFreeInodes(int dev)
+{
   char buf[BLKSIZE];
 
-  // read inode_bitmap block
-  get_block(dev, imap, buf);
+  // dec free inodes count in SUPER and GD
+  get_block(dev, 1, buf);
+  sp = (SUPER *)buf;
+  sp->s_free_inodes_count--;
+  put_block(dev, 1, buf);
 
-  for (i=0; i < ninodes; i++){
-    if (tst_bit(buf, i)==0){
-       set_bit(buf,i);
-       decFreeInodes(dev);
-
-       put_block(dev, imap, buf);
-
-       return i+1;
-    }
-  }
-  printf("ialloc(): no more free inodes\n");
-  return 0;
+  get_block(dev, 2, buf);
+  gp = (GD *)buf;
+  gp->bg_free_inodes_count--;
+  put_block(dev, 2, buf);
 }
 
 int findmyname(MINODE *parent, int myino, char *myname) 
