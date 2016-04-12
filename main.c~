@@ -194,6 +194,13 @@ int search_array(char *function_names[], char *s)
 	return -1;
 }
 
+int touch(char *param){}
+int chmod(char *param){}
+int chown(char *param){}
+int chgrp(char *param){}
+int ls(char *param){}
+int cd(char *param){}
+
 int main(int argc, char *argv[ ]) 
 {
 	  int i,cmd; 
@@ -207,28 +214,33 @@ int main(int argc, char *argv[ ])
 	  init();
 	 
 	  char *function_names[] = {"touch", "chmod", "chown", "chgrp", "ls", "cd", 0};
+	  int (*fptr[])() = {touch, chmod, chown, chgrp, ls, cd, 0};
+		  
 
 	  while(1){
-	      printf("P%d running: ", running->pid);
+		printf("P%d running: ", running->pid);
 
-	      /* zero out pathname, parameter */
-	      for (i=0; i<64; i++){
+		/* zero out pathname, parameter */
+		for (i=0; i<64; i++){
 		  pathname[i]=parameter[i] = 0;
-	      }      
-	      /* these do the same; set the strings to 0 */
-	      memset(pathname, 0, 64);
-	      memset(parameter,0, 64);
+		}      
+		/* these do the same; set the strings to 0 */
+		memset(pathname, 0, 64);
+		memset(parameter,0, 64);
 
-	      printf("input command : ");
-	      gets(line);
-	      if (line[0]==0) continue;
+		printf("input command : ");
+		gets(line);
+		if (line[0]==0) continue;
 
-	      sscanf(line, "%s %s %64c", cname, pathname, parameter);
-	
-	      int function_index = search_array(function_names, cname);
-	      if (function_index == -1){
+		sscanf(line, "%s %s %64c", cname, pathname, parameter);
+
+		int function_index = search_array(function_names, cname);
+		if (function_index == -1){
 			printf("Yo, the %s command is invalid\n", cname);
-	      }
+		}
+		else{
+			int return_val = fptr[function_index](pathname, parameter);
+		}
 	  }
 
 } /* end main */

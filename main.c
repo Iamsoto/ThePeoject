@@ -38,23 +38,6 @@ int get_block(int fd, int blk, char buf[ ])
   read(fd, buf, BLKSIZE);
 }
 
-void ls(char *pathname)
-{
-	
-}
-
-void cd(char *pathname)
-{
-
-	if (strlen(pathname) == 0 )
-	{
-
-	}
-
-
-
-}
-
 void mountroot()   /* mount root file system */
 {
 	  int i, ino, fd;
@@ -194,6 +177,13 @@ int search_array(char *function_names[], char *s)
 	return -1;
 }
 
+int touch(char *param){}
+int chmod(char *param){}
+int chown(char *param){}
+int chgrp(char *param){}
+int ls(char *param){}
+int cd(char *param){}
+
 int main(int argc, char *argv[ ]) 
 {
 	  int i,cmd; 
@@ -207,7 +197,7 @@ int main(int argc, char *argv[ ])
 	  init();
 	 
 	  char *function_names[] = {"touch", "chmod", "chown", "chgrp", "ls", "cd", 0};
-	
+	  int (*fptr[])() = {touch, chmod, chown, chgrp, ls, cd, 0};
 		  
 
 	  while(1){
@@ -232,7 +222,7 @@ int main(int argc, char *argv[ ])
 			printf("Yo, the %s command is invalid\n", cname);
 		}
 		else{
-	
+			int return_val = fptr[function_index](pathname, parameter);
 		}
 	  }
 
