@@ -19,6 +19,5 @@ extern u32 bg_inode_table;
 extern char buf[BLOCK_SIZE];
 extern MINODE minode[NMINODES];
 extern int put_block(int fd, int blk, char buf[ ]);
-extern int ialloc(int dev);
 
 #endif
