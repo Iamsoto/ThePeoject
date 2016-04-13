@@ -1,7 +1,0 @@
-mkfs -b 1024 mydisk 1440
-mkdir mnt
-sudo mount -o loop mydisk mnt
-cd mnt
-sudo mkdir a
-sudo mkdir a/b
-
