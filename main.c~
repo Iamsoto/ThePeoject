@@ -38,6 +38,23 @@ int get_block(int fd, int blk, char buf[ ])
   read(fd, buf, BLKSIZE);
 }
 
+void ls(char *pathname)
+{
+	
+}
+
+void cd(char *pathname)
+{
+
+	if (strlen(pathname) == 0 )
+	{
+
+	}
+
+
+
+}
+
 void mountroot()   /* mount root file system */
 {
 	  int i, ino, fd;
