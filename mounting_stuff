@@ -1,3 +1,4 @@
+echo > mydisk
 mkfs -b 1024 mydisk 1440
 mkdir mnt
 sudo mount -o loop mydisk mnt

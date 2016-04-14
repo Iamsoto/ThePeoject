@@ -156,7 +156,7 @@ int showblock(char *path)
 	for (i = 0; i < n; i++)
 	{
 		char *current_name = entries[i]; 
-		int res = search(InodesBeginBlock,current_name);
+		int res = search_inode(InodesBeginBlock,current_name);
 		if (res == 0){ return printf("Could not find %s\n", path); } 
 		else { //get the next one
 			int next_inode = (res - 1) / 8 + bg_inode_table;

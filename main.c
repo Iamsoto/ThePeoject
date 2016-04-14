@@ -28,138 +28,140 @@ char buf[BLOCK_SIZE];
 
 int put_block(int fd, int blk, char buf[ ])
 {
-  lseek(fd, (long)blk*BLKSIZE, 0);
-  write(fd, buf, BLKSIZE);
+	lseek(fd, (long)blk*BLKSIZE, 0);
+	write(fd, buf, BLKSIZE);
 }
 
 int get_block(int fd, int blk, char buf[ ])
 {
-  lseek(fd, (long)blk*BLKSIZE, 0);
-  read(fd, buf, BLKSIZE);
+	lseek(fd, (long)blk*BLKSIZE, 0);
+	read(fd, buf, BLKSIZE);
 }
 
 void mountroot()   /* mount root file system */
 {
-	  int i, ino, fd;
-	  MOUNT *mp;
-	  SUPER *sp;
-	  MINODE *ip;
+	int i, ino, fd, dev;
+	MOUNT *mp;
+	SUPER *sp;
+	MINODE *ip;
 
-	  char line[64], buf[BLOCK_SIZE], *rootdev;
-	  int ninodes, nblocks, ifree, bfree;
+	char line[64], buf[BLOCK_SIZE], *rootdev;
+	int ninodes, nblocks, ifree, bfree;
 
-	  printf("enter rootdev name (RETURN for disk) : ");
-	  fgets(line, 64, stdin);
+	printf("enter rootdev name (RETURN for disk) : ");
+	gets(line);
 
-	  rootdev = "disk";
+	rootdev = "disk";
 
-	  if (line[0] != 0)
-	     rootdev = line;
+	if (line[0] != 0)
+	rootdev = line;
 
-	  dev = open(rootdev, O_RDWR);
-	  if (dev < 0){
-	     printf("panic : can't open root device\n");
-	     exit(1);
-	  }
+	dev = open(rootdev, O_RDWR);
+	
+	if (dev < 0){
+		printf("panic : can't open root device\n");
+		exit(1);
+	}
 
-	  /* get super block of rootdev */
-	  get_block(dev, 1, buf);
-	  sp = (SUPER *)buf;
+	/* get super block of rootdev */
+	get_block(dev, 1, buf);
+	sp = (SUPER *)buf;
 
-	  ninodes = sp->s_inodes_count;
+	/* check magic number */
+	printf("SUPER magic=0x%x  ", sp->s_magic);
+	if (sp->s_magic != SUPER_MAGIC){
+		printf("super magic=%x : %s is not a valid Ext2 filesys\n", sp->s_magic, rootdev);
+		exit(0);
+	}
 
-	  /* check magic number */
-	  printf("SUPER magic=0x%x  ", sp->s_magic);
-	  if (sp->s_magic != SUPER_MAGIC){
-	     printf("super magic=%x : %s is not a valid Ext2 filesys\n",
-		     sp->s_magic, rootdev);
-	     exit(0);
-	  }
+	mp = &mounttab[0];      /* use mounttab[0] */
 
-	  mp = &mounttab[0];      /* use mounttab[0] */
+	/* copy super block info to mounttab[0] */
+	ninodes = mp->ninodes = sp->s_inodes_count;
+	nblocks = mp->nblocks = sp->s_blocks_count;
 
-	  /* copy super block info to mounttab[0] */
-	  ninodes = mp->ninodes = sp->s_inodes_count;
-	  nblocks = mp->nblocks = sp->s_blocks_count;
-	  
-	  bfree = sp->s_free_blocks_count;
-	  ifree = sp->s_free_inodes_count;
+	bfree = sp->s_free_blocks_count;
+	ifree = sp->s_free_inodes_count;
 
-	  get_block(dev, 2, buf);
-	  gp = (GD *)buf;
+	get_block(dev, 2, buf);
+	gp = (GD *)buf;
 
-	  mp->dev = dev;         
-	  mp->busy = BUSY;
+	mp->dev = dev;         
+	mp->busy = BUSY;
 
-	  mp->bmap = gp->bg_block_bitmap;
-	  mp->imap = gp->bg_inode_bitmap;
-	  mp->iblock = gp->bg_inode_table;
+	mp->bmap = gp->bg_block_bitmap;
+	mp->imap = gp->bg_inode_bitmap;
+	mp->iblock = gp->bg_inode_table;
 
-	  strcpy(mp->name, rootdev);
-	  strcpy(mp->mount_name, "/");
+	strcpy(mp->name, rootdev);
+	strcpy(mp->mount_name, "/");
 
+	printf("bmap=%d  ",   gp->bg_block_bitmap);
+	printf("imap=%d  ",   gp->bg_inode_bitmap);
+	printf("iblock=%d\n", gp->bg_inode_table);  
 
-	  printf("bmap=%d  ",   gp->bg_block_bitmap);
-	  printf("imap=%d  ",   gp->bg_inode_bitmap);
-	  printf("iblock=%d\n", gp->bg_inode_table);  
+	bg_inode_table = gp->bg_inode_table;
 
+	/***** call iget(), which inc the Minode's refCount ****/
 
-	  /***** call iget(), which inc the Minode's refCount ****/
+	root = iget(dev, 2);          /* get root inode */
+	//printf("size of root = %d\n", root->INODE.i_size);
+	printf("Block number of root is %d\n", root->INODE.i_block[0]);
+	getchar();
+	mp->mounted_inode = root;
+	root->mountptr = mp;
 
-	  root = iget(dev, 2);          /* get root inode */
-	  mp->mounted_inode = root;
-	  root->mountptr = mp;
-
-	  printf("mount : %s  mounted on / \n", rootdev);
-	  printf("nblocks=%d  bfree=%d   ninodes=%d  ifree=%d\n",
-		  nblocks, bfree, ninodes, ifree);
+	printf("mount : %s  mounted on / \n", rootdev);
+	printf("nblocks=%d  bfree=%d   ninodes=%d  ifree=%d\n", nblocks, bfree, ninodes, ifree);
 } 
 
 void init()
 {
-	  int i, j;
-	  PROC *p;
+	int i, j;
+	PROC *p;
 
-	  for (i=0; i<NMINODES; i++)
-	      minode[i].refCount = 0;
+	for (i=0; i<NMINODES; i++)
+	minode[i].refCount = 0;
 
-	  for (i=0; i<NMOUNT; i++)
-	      mounttab[i].busy = 0;
+	for (i=0; i<NMOUNT; i++)
+		mounttab[i].busy = 0;
 
-	  for (i=0; i<NPROC; i++){
-	      proc[i].status = FREE;
-	      for (j=0; j<NFD; j++)
-		  proc[i].fd[j] = 0;
-	      proc[i].next = &proc[i+1];
-	  }
+	for (i=0; i<NPROC; i++){
+		proc[i].status = FREE;
 
-	  for (i=0; i<NOFT; i++)
-	      oft[i].refCount = 0;
+	for (j=0; j<NFD; j++)
+		proc[i].fd[j] = 0;
+		proc[i].next = &proc[i+1];
+	}
 
-	  printf("mounting root\n");
-	    mountroot();
-	  printf("mounted root\n");
+	for (i=0; i<NOFT; i++)
+		oft[i].refCount = 0;
 
-	  printf("creating P0, P1\n");
-	  p = running = &proc[0];
-	  p->status = BUSY;
-	  p->uid = 0; 
-	  p->pid = p->ppid = p->gid = 0;
-	  p->parent = p->sibling = p;
-	  p->child = 0;
-	  p->cwd = root;
-	  p->cwd->refCount++;
+	printf("mounting root\n");
+	mountroot();
 
-	  p = &proc[1];
-	  p->next = &proc[0];
-	  p->status = BUSY;
-	  p->uid = 2; 
-	  p->pid = 1;
-	  p->ppid = p->gid = 0;
-	  p->cwd = root;
-	  p->cwd->refCount++;
-	  
-	  nproc = 2;
+	printf("mounted root\n");
+	print_dir_entries(root, "");
+	printf("creating P0, P1\n");
+	p = running = &proc[0];
+	p->status = BUSY;
+	p->uid = 0; 
+	p->pid = p->ppid = p->gid = 0;
+	p->parent = p->sibling = p;
+	p->child = 0;
+	p->cwd = root;
+	p->cwd->refCount++;
+
+	p = &proc[1];
+	p->next = &proc[0];
+	p->status = BUSY;
+	p->uid = 2; 
+	p->pid = 1;
+	p->ppid = p->gid = 0;
+	p->cwd = root;
+	p->cwd->refCount++;
+
+	nproc = 2;
 }
 
 int quit()
@@ -175,6 +177,7 @@ int search_array(char *function_names[], char *s)
 		if (strcmp(function_names[i], s) == 0){
 			return i;
 		}
+		i++;
 	}
 	return -1;
 }
@@ -183,7 +186,18 @@ int touch(char *param){}
 int my_chmod(char *param){}
 int chown(char *param){}
 int chgrp(char *param){}
-int ls(char *param){}
+
+int ls(char *param)
+{
+
+	printf("You have chosen to ls %s\n", pathname);
+	getchar();
+
+	//int print_dir_entries(MINODE *mip, char *name);
+	//print_dir_entries(running->cwd, param);
+	print_dir_entries(root, param);
+}
+
 int cd(char *param){}
 
 int main(int argc, char *argv[ ]) 
@@ -215,7 +229,7 @@ int main(int argc, char *argv[ ])
 
 		printf("input command : ");
 		
-		fgets(line, 128, stdin);
+		gets(line);
 		if (line[0]==0) continue;
 
 		sscanf(line, "%s %s %64c", cname, pathname, parameter);

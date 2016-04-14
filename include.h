@@ -9,9 +9,13 @@ typedef unsigned int u32;
 extern int dev;
 extern int ninodes;
 
+extern MINODE minode[NMINODES];
+
+extern int print_dir_entries(MINODE *mip, char *name);
 extern MINODE *iget(int dev, int ino);
 extern int get_block(int fd, int blk, char buf[ ]);
-extern int search(INODE * inodePtr, char * name);
+extern int search_inode(INODE * inodePtr, char * name);
+extern int search_minode(MINODE *mip, char *name);
 extern MINODE *iget(int dev, int ino);
 extern int fd;
 extern MINODE *root;
