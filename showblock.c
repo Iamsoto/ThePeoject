@@ -48,7 +48,7 @@ int search(INODE * inodePtr, char * name)
 	      		printf("%.4d  %.4d  %.4d  [%s]\n", dp->inode, dp->rec_len, dp->name_len, temp);
 			if (strcmp(dp->name, folder_name) == 0)
 			{
-				printf("Found %s\n", folder_name);
+				//printf("Found %s\n", folder_name);
 
 				return dp->inode;
 			}

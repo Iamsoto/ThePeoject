@@ -22,7 +22,7 @@ MOUNT *getmountp();
 int DEBUG=0;
 int nproc=0;
 
-int fd;
+int fd = 0;
 
 char buf[BLOCK_SIZE];
 
@@ -40,7 +40,7 @@ int get_block(int fd, int blk, char buf[ ])
 
 void mountroot()   /* mount root file system */
 {
-	int i, ino, fd, dev;
+	int i, ino;
 	MOUNT *mp;
 	SUPER *sp;
 	MINODE *ip;
@@ -54,9 +54,11 @@ void mountroot()   /* mount root file system */
 	rootdev = "disk";
 
 	if (line[0] != 0)
-	rootdev = line;
+		rootdev = line;
 
 	dev = open(rootdev, O_RDWR);
+	printf("dev = %d\n", dev);
+	fd = dev;
 	
 	if (dev < 0){
 		printf("panic : can't open root device\n");
@@ -103,8 +105,9 @@ void mountroot()   /* mount root file system */
 	bg_inode_table = gp->bg_inode_table;
 
 	/***** call iget(), which inc the Minode's refCount ****/
-
+	printf("Before call root is %d\n", root);
 	root = iget(dev, 2);          /* get root inode */
+	printf("After call root is %.4x\n", root);
 	printf("size of root = %d\n", root->INODE.i_size);
 	printf("Block number of root is %d\n", root->INODE.i_block[0]);
 	getchar();
@@ -189,12 +192,8 @@ int chgrp(char *param){}
 
 int ls(char *param)
 {
-
 	printf("You have chosen to ls %s\n", pathname);
 	getchar();
-
-	//int print_dir_entries(MINODE *mip, char *name);
-	//print_dir_entries(running->cwd, param);
 	print_dir_entries(root, param);
 }
 

@@ -34,15 +34,16 @@ MINODE *iget(int dev, int ino)
 	(2). Find a minode[i] whose refCount = 0 => let MINODE *mip = &minode[i];
 	*/
 
-	MINODE *mip;
+	MINODE *mip = 0;
 	int i;
 	for (i = 0; i < NMINODES; i++)
 	{
 		if (minode[i].dev == dev && minode[i].ino == ino){
 			minode[i].refCount++;
 			return &minode[i];
-		}else if (minode[i].refCount == 0){
+		}else if (minode[i].refCount == 0 && mip == 0){
 			mip = &(minode[i]);
+			printf("Found minode at index %d\n", i);		
 		}	
 	}
 
@@ -55,19 +56,15 @@ MINODE *iget(int dev, int ino)
 
     /*  (4). read blk into buf[ ]; 	*/
 
-	printf("Getting block %d with offset %d\n", blk, offset);
+	printf("Getting block %d with offset %d from file descriptor %d\n", blk, offset, fd);
 	get_block(fd, blk, buf);
 	INODE *ip = (INODE *)buf + offset;
+
+	
 	
       //(5). COPY *ip into mip->INODE
 
 	mip->INODE = *ip;
-
-	//printf("Mip's inode is %d\n", ip);
-	
-	for (i = 0; i < EXT2_N_BLOCKS; i++){
-		printf("i_block[%d] = %d\n", i, ip->i_block[i]);
-	}
 
      // (6). initialize other fields of *mip: 
 
