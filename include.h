@@ -11,7 +11,8 @@ extern int ninodes;
 
 extern MINODE minode[NMINODES];
 
-extern int print_dir_entries(MINODE *mip, char *name);
+extern char **BrokenDownPath(char *path, int *count);
+extern int print_dir_entries(MINODE *mip);
 extern MINODE *iget(int dev, int ino);
 extern int get_block(int fd, int blk, char buf[ ]);
 extern int search_inode(INODE * inodePtr, char * name);

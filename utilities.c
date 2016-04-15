@@ -60,8 +60,12 @@ MINODE *iget(int dev, int ino)
 	get_block(fd, blk, buf);
 	INODE *ip = (INODE *)buf + offset;
 
-	
-	
+	/*Find the name*/	
+	//int findmyname(MINODE *parent, int myino, char *myname) 
+	//char name[128];
+	//findmyname(mip, ino, name);
+	//strcpy(mip->name, name);
+
       //(5). COPY *ip into mip->INODE
 
 	mip->INODE = *ip;
@@ -141,12 +145,34 @@ int decFreeInodes(int dev)
 int findmyname(MINODE *parent, int myino, char *myname) 
 {
 	char *parent_name = parent->name;
-	INODE parent_inode = parent->INODE;
+	INODE parent_inode = parent->INODE;return;
 	/*
 	   Given the parent DIR (MINODE pointer) and myino, this function finds 
 	   the name string of myino in the parent's data block. This is the SAME
 	   as SEARCH() by myino, then copy its name string into myname[ ].
 	*/
+	int i = 0;
+	
+	char *cp;  char temp[256];
+       	DIR  *dp;
+	for (i = 0; i < 12; i++){
+		int current_block = parent_inode.i_block[i];
+		get_block(fd, ip->i_block[i], buf);     // read INODE's i_block[0]
+	       	cp = buf;  
+	       	dp = (DIR*)buf;
+	       	while(cp < buf + BLKSIZE){
+	      		if (dp->rec_len == 0) { return;}// printf("Could not find %s\n", folder_name); }
+			if (dp->inode == myino){
+				strncpy(temp, dp->name, dp->name_len);
+				temp[dp->name_len] = 0;
+				strcpy(myname, temp);
+				return 0;
+			}	      		
+			// move to the next DIR entry:
+	      		cp += (dp->rec_len);   // advance cp by rec_len BYTEs
+	      		dp = (DIR*)cp;     // pull dp along to the next record
+	       	}
+	}
 }
 
 int search_minode(MINODE *mip, char *name)
@@ -161,7 +187,7 @@ int search_minode(MINODE *mip, char *name)
 	return -1;
 }
 
-int print_dir_entries(MINODE *mip, char *name)
+int print_dir_entries(MINODE *mip)
 {
 	printf("Printing dir entries\n");
 	int i; 
@@ -183,17 +209,13 @@ int print_dir_entries(MINODE *mip, char *name)
 		dp = (DIR *)sbuf;
 		cp = sbuf;
 		while (cp < sbuf + BLKSIZE){			  	
-			printf("inode=%d rec_len=%d name_len=%d name=%s\n", dp->inode, dp->rec_len, dp->name_len, dp->name);
-			
+			printf("inode=%.4d rec_len=%.4d name_len=%.4d name=%s\n", dp->inode, dp->rec_len, dp->name_len, dp->name);
 			// print dp->inode, dp->rec_len, dp->name_len, dp->name);
 		  	// WRITE YOUR CODE TO search for name: return its ino if found
-			int name_ino_num = search(ip, name);
-			if (name_ino_num != 0)
-			{
-				return name_ino_num;
-			}
-			int blk = (name_ino_num - 1) / 8 + bg_inode_table;
-			int offset = (name_ino_num - 1) % 8; 			
+			//int name_ino_num = search_inode(ip, "asdads");
+			
+			//int blk = (name_ino_num - 1) / 8 + bg_inode_table;
+			//int offset = (name_ino_num - 1) % 8; 			
 			cp += dp->rec_len;
 			dp = (DIR *)cp;
 		}
@@ -206,9 +228,47 @@ int findino(MINODE *mip, int *myino, int *parentino)
 	/*
 	For a DIR Minode, extract the inumbers of . and .. 
 	Read in 0th data block. The inumbers are in the first two dir entries.
-	*/
-	
+	*/	
 }
+
+char **BrokenDownPath(char *path, int *count){
+	char **path_parts;
+	char path_copy[256];
+	strcpy(path_copy, path);
+
+	char *entries[256] = { 0 };
+	int i = 0;
+
+	char * s = strtok(path_copy, "/");	
+	
+	if (s == 0){
+		//printf("Path is null\n");
+		if (*path == '/')			
+			s = "/";
+	}
+
+	entries[i] = s;
+	i++;
+	
+	if (strcmp(s, "/") == 0){
+		*count = i;
+		path_parts = entries;
+		return path_parts;	
+	}
+
+	while (	s = strtok(0, "/") )
+	{
+		entries[i] = s;
+		i++;
+	}
+
+	entries[i] = 0;
+	*count = i;
+	path_parts = entries;
+	return path_parts;
+}
+
+
 
 
 

@@ -18,9 +18,7 @@ DIR   *dp;
 
 char *disk = "mydisk";
 
-char *entries[256] = { 0 };
-
-int search(INODE * inodePtr, char * name)
+int search_inode(INODE * inodePtr, char * name)
 {
 	//get the data block of inodePtr
 	printf("===================================\n");
@@ -44,7 +42,7 @@ int search(INODE * inodePtr, char * name)
 	       	while(cp < buf + BLKSIZE){
 	      		strncpy(temp, dp->name, dp->name_len);
 	      		temp[dp->name_len] = 0;
-			if (dp->rec_len == 0) { return printf("Could not find %s\n", folder_name); }
+			if (dp->rec_len == 0) { return;}// printf("Could not find %s\n", folder_name); }
 	      		printf("%.4d  %.4d  %.4d  [%s]\n", dp->inode, dp->rec_len, dp->name_len, temp);
 			if (strcmp(dp->name, folder_name) == 0)
 			{

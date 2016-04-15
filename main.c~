@@ -105,9 +105,8 @@ void mountroot()   /* mount root file system */
 	bg_inode_table = gp->bg_inode_table;
 
 	/***** call iget(), which inc the Minode's refCount ****/
-	printf("Before call root is %d\n", root);
 	root = iget(dev, 2);          /* get root inode */
-	printf("After call root is %.4x\n", root);
+	strcpy(root->name, "/");
 	printf("size of root = %d\n", root->INODE.i_size);
 	printf("Block number of root is %d\n", root->INODE.i_block[0]);
 	getchar();
@@ -144,7 +143,7 @@ void init()
 	mountroot();
 
 	printf("mounted root\n");
-	print_dir_entries(root, "");
+	//print_dir_entries(root);
 	printf("creating P0, P1\n");
 	p = running = &proc[0];
 	p->status = BUSY;
@@ -190,14 +189,56 @@ int my_chmod(char *param){}
 int chown(char *param){}
 int chgrp(char *param){}
 
-int ls(char *param)
+int ls(char *path)
 {
-	printf("You have chosen to ls %s\n", pathname);
-	getchar();
-	print_dir_entries(root, param);
+	//search to see if the inode is in memory or not
+	//if it isn't, bring it to memory
+	//in ls a/b/c bring c to memory if it isn't already
+	int count;
+	int i;
+	char **path_parts = BrokenDownPath(path, &count);
+
+	//from root or from cwd?
+	int from_root = (strcmp(path_parts[0], "/") == 0);
+	MINODE *current_location = root;
+	if (!from_root){
+		current_location = running->cwd;
+	}	
+
+	//go inside every MINODE, get the INODE, search
+	//its data blocks for the next entry to be found
+	//if it isn't found, print this
+
+	INODE *current_inode = &(current_location->INODE);
+
+	printf("start_location = %s\n", current_location->name);
+	printf("start_location ino = %d\n", current_location->ino);
+	printf("start_location dev = %d\n", current_location->dev);
+	for (i = 0; i < count; i++){	
+		printf("path_parts[%d] = %s\n", i, path_parts[i]);
+		int return_ino = search_inode(current_inode, path_parts[i]);
+		if (return_ino == 0){
+			printf("Could not find %s\n", path);			
+			//return;		
+		}
+
+		//return_ino is valid
+		int blk = (return_ino - 1) / 8 + bg_inode_table;
+		int offset = (return_ino - 1) % 8;
+		get_block(fd, blk, buf);
+		current_inode = (INODE*)buf + offset;
+	}
+
+	//we have the inode we want to print
+	
+	for (i = 0; i < 12; i++){
+		printf("i_block[%.2d] = %.2d\n", i, current_inode->i_block[i]);
+	}	
 }
 
-int cd(char *param){}
+int cd(char *param){
+
+}
 
 int main(int argc, char *argv[ ]) 
 {
