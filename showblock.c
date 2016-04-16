@@ -1,4 +1,6 @@
-#include "include.h"	
+//#include "include.h"	
+
+char buf[BLOCK_SIZE];
 
 //change shutup to dir
 
@@ -17,48 +19,6 @@ INODE *ip;
 DIR   *dp; 
 
 char *disk = "mydisk";
-
-int search_inode(INODE * inodePtr, char * name)
-{
-	//get the data block of inodePtr
-	printf("===================================\n");
-	ip = inodePtr;
-	int k, i;
-	
-	char *folder_name = basename(name);
-
-	//printf("Found %d token(s)\n", count);	
-
-	char *cp;  char temp[256];
-       	DIR  *dp;
-
-       	// ASSUME INODE *ip -> INODE
-	for (i = 0; i < 12; i++)
-	{
-	       	printf("i_block[%d] = %d\n", i, ip->i_block[i]); // print blk number
-	       	get_block(fd, ip->i_block[i], buf);     // read INODE's i_block[0]
-	       	cp = buf;  
-	       	dp = (DIR*)buf;
-	       	while(cp < buf + BLKSIZE){
-	      		strncpy(temp, dp->name, dp->name_len);
-	      		temp[dp->name_len] = 0;
-			if (dp->rec_len == 0) { return;}// printf("Could not find %s\n", folder_name); }
-	      		printf("%.4d  %.4d  %.4d  [%s]\n", dp->inode, dp->rec_len, dp->name_len, temp);
-			if (strcmp(dp->name, folder_name) == 0)
-			{
-				//printf("Found %s\n", folder_name);
-
-				return dp->inode;
-			}
-	      		//getchar();			
-	      		// move to the next DIR entry:
-	      		cp += (dp->rec_len);   // advance cp by rec_len BYTEs
-	      		dp = (DIR*)cp;     // pull dp along to the next record
-	       	}
-	}
-
-	return 0;
-}
 
 int print_superblock()
 {

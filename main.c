@@ -3,8 +3,8 @@
 /************************ globals *****************************/
 
 int dev;
-
-char pathname[128], parameter[128], *name[128], cwdname[128];
+static char *name[128];
+char pathname[128], parameter[128], cwdname[128];
 char names[128][256];
 
 int  nnames;
@@ -23,8 +23,13 @@ int DEBUG=0;
 int nproc=0;
 
 int fd = 0;
+u32 bg_inode_table;
 
 char buf[BLOCK_SIZE];
+
+	MOUNT *mp;
+	SUPER *sp;
+	//MINODE *ip;
 
 int put_block(int fd, int blk, char buf[ ])
 {
@@ -41,17 +46,15 @@ int get_block(int fd, int blk, char buf[ ])
 void mountroot()   /* mount root file system */
 {
 	int i, ino;
-	MOUNT *mp;
-	SUPER *sp;
-	MINODE *ip;
 
 	char line[64], buf[BLOCK_SIZE], *rootdev;
 	int ninodes, nblocks, ifree, bfree;
 
-	printf("enter rootdev name (RETURN for disk) : ");
-	gets(line);
-
-	rootdev = "disk";
+	rootdev = "mydisk";
+	
+	printf("enter rootdev name (RETURN for %s) : ", rootdev);
+	fgets(line, 64, stdin);
+	line[strlen(line)-1] = 0;
 
 	if (line[0] != 0)
 		rootdev = line;
@@ -105,7 +108,7 @@ void mountroot()   /* mount root file system */
 	bg_inode_table = gp->bg_inode_table;
 
 	/***** call iget(), which inc the Minode's refCount ****/
-	root = iget(dev, 2);          /* get root inode */
+	root = iget(dev, 2, bg_inode_table);          /* get root inode */
 	strcpy(root->name, "/");
 	printf("size of root = %d\n", root->INODE.i_size);
 	printf("Block number of root is %d\n", root->INODE.i_block[0]);
@@ -191,19 +194,22 @@ int chgrp(char *param){}
 
 int ls(char *path)
 {
+	printf("bg_inode_table = %d\n", bg_inode_table);
 	//search to see if the inode is in memory or not
 	//if it isn't, bring it to memory
 	//in ls a/b/c bring c to memory if it isn't already
 	int count;
 	int i;
-	char **path_parts = BrokenDownPath(path, &count);
-
+	
 	//from root or from cwd?
-	int from_root = (strcmp(path_parts[0], "/") == 0);
+
+	int from_root = 1;
+	if (*path != '/') from_root = 0;
+
 	MINODE *current_location = root;
 	if (!from_root){
 		current_location = running->cwd;
-	}	
+	}
 
 	//go inside every MINODE, get the INODE, search
 	//its data blocks for the next entry to be found
@@ -214,30 +220,146 @@ int ls(char *path)
 	printf("start_location = %s\n", current_location->name);
 	printf("start_location ino = %d\n", current_location->ino);
 	printf("start_location dev = %d\n", current_location->dev);
-	for (i = 0; i < count; i++){	
-		printf("path_parts[%d] = %s\n", i, path_parts[i]);
-		int return_ino = search_inode(current_inode, path_parts[i]);
+
+	int blk, offset, return_ino;
+	char *current_part = "";
+	while (current_part = parse_pathname(path)){	
+		printf("Found current_inode = %.8x\n", current_inode);
+		printf("current_part = [%s]\n", current_part);
+		char other_temp[256];
+		strcpy(other_temp, current_part);
+		return_ino = search_inode(current_inode, other_temp);
 		if (return_ino == 0){
-			printf("Could not find %s\n", path);			
-			return;		
+			printf("could not find %s\n", current_part);return;		
+		}else{
+			printf("Found inode %d for %s\n", return_ino, current_part);
 		}
 
 		//return_ino is valid
-		int blk = (return_ino - 1) / 8 + bg_inode_table;
-		int offset = (return_ino - 1) % 8;
+		blk = (return_ino - 1) / 8 + bg_inode_table;
+		offset = (return_ino - 1) % 8;
+		printf("block %d offset %d\n", blk, offset);
 		get_block(fd, blk, buf);
 		current_inode = (INODE*)buf + offset;
 	}
 
 	//we have the inode we want to print
 	
-	for (i = 0; i < 12; i++){
-		printf("i_block[%.2d] = %.2d\n", i, current_inode->i_block[i]);
-	}	
+	printf("Found current_inode = %.8x\n", current_inode);
+
+	MINODE *mip = iget(dev, return_ino, bg_inode_table);
+	mip->INODE = *current_inode;
+	print_dir_entries(mip);			
 }
 
 int cd(char *param){
 
+}
+
+int clear(){
+	int i;
+	for (i = 0; i < 33; i++){
+		printf("\n");
+	}
+}
+
+int my_open(){
+	return 0;
+}
+
+int my_mkdir(char *pathname){
+	char *parent = "..";
+	int pino  = getino(&dev, parent);
+	printf("pino = %d\n", pino);
+	MINODE *pip   = iget(dev, pino, bg_inode_table); 
+	kmkdir(pip, pathname, pino);
+}
+
+int kmkdir(MINODE *pip, char *name, int pino){
+
+
+
+	//2. allocate an inode and a disk block for the new directory;
+	int ino = ialloc(dev, bg_inode_table);    
+	int bno = balloc(dev);
+
+	MINODE *mip = iget(dev, ino, bg_inode_table); /* 3.to load the inode into a minode[] (in order to
+  	 wirte contents to the INODE in memory). */
+	
+	//4. Write contents to mip->INODE to make it as a DIR.
+	//5. iput(mip); which should write the new INODE out to disk.
+	INODE *ip = &mip->INODE;
+
+	/*Set all of the MINODE and INOE properties*/
+	ip->i_mode 	  = 0x41ED;
+	ip->i_uid    	  = running->uid;
+	ip->i_gid  	  = running->gid;
+	ip->i_size	  = 1024;
+	ip->i_links_count = 2; 
+	ip->i_atime       = ip->i_ctime = ip->i_mtime = time(0L);
+	ip->i_blocks      = 2;
+	ip->i_block[0]    = bno;
+
+	mip->dirty        = 1;
+	iput(mip);
+
+	/*Create data block for new DIR containing . and .. entries
+	into a buf of BLKSIZE 
+	write buf to disk
+	*/
+	
+	char temp_buf[1024];
+	char *temp_buffer_pointer;
+	
+	DIR *dot_entry      = malloc(sizeof(DIR));
+	dot_entry->inode    = ino;
+	dot_entry->rec_len  = 12;
+	dot_entry->name_len = 1;
+	strcpy(dot_entry->name, ".");
+
+	temp_buffer_pointer = (char*)dot_entry;
+	strcpy(temp_buf, temp_buffer_pointer);
+
+	DIR *dot_dot_entry      = malloc(sizeof(DIR));
+	dot_dot_entry->inode    = pino;
+	dot_dot_entry->rec_len  = pino;
+	dot_dot_entry->name_len = 2;
+	strcpy(dot_dot_entry->name, ".."); 
+	
+	temp_buffer_pointer = (char*)dot_dot_entry;
+	strcat(temp_buf, temp_buffer_pointer);
+
+	put_block(fd, bno, buf);
+
+	/*Enter name entry into parent's directory by enter_name(pip, ino, name)*/
+}
+
+int enter_name(MINODE *pip, int myino, char *myname){
+	INODE current_inode = pip->INODE;	
+	int i;
+	char *cp;
+	DIR *dp;
+	int needed_length;
+	int remain;
+	for (i = 0; i < 12; i++){
+		if (current_inode.i_block[i] == 0) break;
+		get_block(fd, current_inode.i_block[i], buf);
+		needed_length = 4 * ( (8 + strlen(myname) + 3) / 4);
+		//get the parent's ith data block into a buf
+		get_block(pip->dev, pip->INODE.i_block[i], buf);
+		dp = (DIR *)buf;
+		cp = buf;
+		int blk = pip->INODE.i_block[i];
+		printf("step to LAST entry in data block %d\n", blk);
+		while (cp + dp->rec_len < buf + BLKSIZE){
+			cp += dp->rec_len;
+			dp = (DIR*)cp;
+			remain = dp->rec_len;
+		}
+		if (remain >= needed_length){
+		/*Enter the new entry as the last entry and trim the previous entry to its ideal length*/
+		}
+	}
 }
 
 int main(int argc, char *argv[ ]) 
@@ -252,9 +374,10 @@ int main(int argc, char *argv[ ])
 
 	  init();
 	 
-	  char *function_names[] = {"touch", "chmod", "chown", "chgrp", "ls", "cd", 0};
-	  int (*fptr[])() = {touch, my_chmod, chown, chgrp, ls, cd, 0};
-		  
+	  char *function_names[] = {"touch", "chmod", "chown", "chgrp", "ls", "cd", "clear", "open", "mkdir", 0};
+	  int (*fptr[])() = {touch, my_chmod, chown, chgrp, ls, cd, clear, my_open, my_mkdir, 0};
+
+	  ninodes = sp->s_inodes_count;
 
 	  while(1){
 		printf("P%d running: ", running->pid);
@@ -269,7 +392,8 @@ int main(int argc, char *argv[ ])
 
 		printf("input command : ");
 		
-		gets(line);
+		fgets(line,128,stdin);
+		line[strlen(line)-1]=0;
 		if (line[0]==0) continue;
 
 		sscanf(line, "%s %s %64c", cname, pathname, parameter);
@@ -286,8 +410,5 @@ int main(int argc, char *argv[ ])
 } /* end main */
 
 // NOTE: you MUST use a function pointer table
-
-
-
 
 
