@@ -2,6 +2,9 @@
 
 /************************ globals *****************************/
 
+extern int cd(char *param);
+extern int pwd(char *param);
+
 int dev;
 static char *name[128];
 char pathname[128], parameter[128], cwdname[128];
@@ -31,6 +34,8 @@ char buf[BLOCK_SIZE];
 	SUPER *sp;
 	//MINODE *ip;
 
+int my_mkdir(char *pathname);
+
 int put_block(int fd, int blk, char buf[ ])
 {
 	lseek(fd, (long)blk*BLKSIZE, 0);
@@ -42,6 +47,7 @@ int get_block(int fd, int blk, char buf[ ])
 	lseek(fd, (long)blk*BLKSIZE, 0);
 	read(fd, buf, BLKSIZE);
 }
+
 
 void mountroot()   /* mount root file system */
 {
@@ -108,7 +114,7 @@ void mountroot()   /* mount root file system */
 	bg_inode_table = gp->bg_inode_table;
 
 	/***** call iget(), which inc the Minode's refCount ****/
-	root = iget(dev, 2, bg_inode_table);          /* get root inode */
+	root = iget(dev, 2);          /* get root inode */
 	strcpy(root->name, "/");
 	printf("size of root = %d\n", root->INODE.i_size);
 	printf("Block number of root is %d\n", root->INODE.i_block[0]);
@@ -223,12 +229,12 @@ int ls(char *path)
 
 	int blk, offset, return_ino;
 	char *current_part = "";
-	while (current_part = parse_pathname(path)){	
-		printf("Found current_inode = %.8x\n", current_inode);
+	while (current_part = (char*)parse_pathname(path)){	
+		//printf("Found current_inode = %.8x\n", current_inode);
 		printf("current_part = [%s]\n", current_part);
 		char other_temp[256];
 		strcpy(other_temp, current_part);
-		return_ino = search_inode(current_inode, other_temp);
+		return_ino = search(current_inode, other_temp);
 		if (return_ino == 0){
 			printf("could not find %s\n", current_part);return;		
 		}else{
@@ -245,15 +251,11 @@ int ls(char *path)
 
 	//we have the inode we want to print
 	
-	printf("Found current_inode = %.8x\n", current_inode);
+	//printf("Found current_inode = %.8x\n", current_inode);
 
-	MINODE *mip = iget(dev, return_ino, bg_inode_table);
+	MINODE *mip = iget(dev, return_ino);
 	mip->INODE = *current_inode;
 	print_dir_entries(mip);			
-}
-
-int cd(char *param){
-
 }
 
 int clear(){
@@ -265,101 +267,6 @@ int clear(){
 
 int my_open(){
 	return 0;
-}
-
-int my_mkdir(char *pathname){
-	char *parent = "..";
-	int pino  = getino(&dev, parent);
-	printf("pino = %d\n", pino);
-	MINODE *pip   = iget(dev, pino, bg_inode_table); 
-	kmkdir(pip, pathname, pino);
-}
-
-int kmkdir(MINODE *pip, char *name, int pino){
-
-
-
-	//2. allocate an inode and a disk block for the new directory;
-	int ino = ialloc(dev, bg_inode_table);    
-	int bno = balloc(dev);
-
-	MINODE *mip = iget(dev, ino, bg_inode_table); /* 3.to load the inode into a minode[] (in order to
-  	 wirte contents to the INODE in memory). */
-	
-	//4. Write contents to mip->INODE to make it as a DIR.
-	//5. iput(mip); which should write the new INODE out to disk.
-	INODE *ip = &mip->INODE;
-
-	/*Set all of the MINODE and INOE properties*/
-	ip->i_mode 	  = 0x41ED;
-	ip->i_uid    	  = running->uid;
-	ip->i_gid  	  = running->gid;
-	ip->i_size	  = 1024;
-	ip->i_links_count = 2; 
-	ip->i_atime       = ip->i_ctime = ip->i_mtime = time(0L);
-	ip->i_blocks      = 2;
-	ip->i_block[0]    = bno;
-
-	mip->dirty        = 1;
-	iput(mip);
-
-	/*Create data block for new DIR containing . and .. entries
-	into a buf of BLKSIZE 
-	write buf to disk
-	*/
-	
-	char temp_buf[1024];
-	char *temp_buffer_pointer;
-	
-	DIR *dot_entry      = malloc(sizeof(DIR));
-	dot_entry->inode    = ino;
-	dot_entry->rec_len  = 12;
-	dot_entry->name_len = 1;
-	strcpy(dot_entry->name, ".");
-
-	temp_buffer_pointer = (char*)dot_entry;
-	strcpy(temp_buf, temp_buffer_pointer);
-
-	DIR *dot_dot_entry      = malloc(sizeof(DIR));
-	dot_dot_entry->inode    = pino;
-	dot_dot_entry->rec_len  = pino;
-	dot_dot_entry->name_len = 2;
-	strcpy(dot_dot_entry->name, ".."); 
-	
-	temp_buffer_pointer = (char*)dot_dot_entry;
-	strcat(temp_buf, temp_buffer_pointer);
-
-	put_block(fd, bno, buf);
-
-	/*Enter name entry into parent's directory by enter_name(pip, ino, name)*/
-}
-
-int enter_name(MINODE *pip, int myino, char *myname){
-	INODE current_inode = pip->INODE;	
-	int i;
-	char *cp;
-	DIR *dp;
-	int needed_length;
-	int remain;
-	for (i = 0; i < 12; i++){
-		if (current_inode.i_block[i] == 0) break;
-		get_block(fd, current_inode.i_block[i], buf);
-		needed_length = 4 * ( (8 + strlen(myname) + 3) / 4);
-		//get the parent's ith data block into a buf
-		get_block(pip->dev, pip->INODE.i_block[i], buf);
-		dp = (DIR *)buf;
-		cp = buf;
-		int blk = pip->INODE.i_block[i];
-		printf("step to LAST entry in data block %d\n", blk);
-		while (cp + dp->rec_len < buf + BLKSIZE){
-			cp += dp->rec_len;
-			dp = (DIR*)cp;
-			remain = dp->rec_len;
-		}
-		if (remain >= needed_length){
-		/*Enter the new entry as the last entry and trim the previous entry to its ideal length*/
-		}
-	}
 }
 
 int main(int argc, char *argv[ ]) 
@@ -374,8 +281,8 @@ int main(int argc, char *argv[ ])
 
 	  init();
 	 
-	  char *function_names[] = {"touch", "chmod", "chown", "chgrp", "ls", "cd", "clear", "open", "mkdir", 0};
-	  int (*fptr[])() = {touch, my_chmod, chown, chgrp, ls, cd, clear, my_open, my_mkdir, 0};
+	  char *function_names[] = {"touch", "chmod", "chown", "chgrp", "ls", "cd", "clear", "open", "mkdir", "pwd", 0};
+	  int (*fptr[])() = {touch, my_chmod, chown, chgrp, ls, cd, clear, my_open, my_mkdir, pwd, 0};
 
 	  ninodes = sp->s_inodes_count;
 
