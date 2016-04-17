@@ -7,11 +7,12 @@ int ninodes;
 int iput(MINODE *mip)
 {
 	mip->refCount--; //decrease refCount by 1
-	if (mip->refCount > 0){
-		return;
+	if (mip->refCount > 0 && mip->dirty != 1){
+		return 0;
 	}
 	if (mip->dirty == 0){
-		return;
+		strcpy(mip->name, "");
+		return 0;
 	}
 	if (mip->refCount > 0 && mip->dirty == 1){
 		//must write the INODE back to disk
@@ -26,8 +27,11 @@ int iput(MINODE *mip)
 	}
 }
 
+
+
 MINODE *iget(int dev, int ino)
 {
+	printf("Entering iget\n");
 	/*
 	(1). Search minode[i] for an entry whose refCount > 0 with the SAME (dev,ino)
      	     if found: refCount++; mip-return &minode[i];
@@ -39,11 +43,28 @@ MINODE *iget(int dev, int ino)
 	for (i = 0; i < NMINODES; i++)
 	{
 		if (minode[i].dev == dev && minode[i].ino == ino){
+			// If the minode doesn't have a name...
+			if(strcmp(minode[i].name, "") == 0){
+				// If ino isn't root..
+				if(ino > 2) {
+					// Assign a name to the bitch.
+					DIR * dp  = getDir(&(minode[i].INODE), minode[i].ino );
+					if(dp != -1){
+
+					printf("Adding a mip name %s, \n", dp->name);
+
+					strcpy(minode[i].name, dp->name);
+					minode[i].name[dp->name_len] =0;
+					}
+				}
+			}
+
+			printf("Found a minode with name: %s and index: %d\n", minode[i].name, i);
 			minode[i].refCount++;
 			return &minode[i];
 		}else if (minode[i].refCount == 0 && mip == 0){
 			mip = &(minode[i]);
-			printf("Found minode at index %d\n", i);		
+			printf("\ninode allocated at index %d\n", i);
 		}	
 	}
 
@@ -66,7 +87,20 @@ MINODE *iget(int dev, int ino)
 
 	mip->INODE = *ip;
 
-     // (6). initialize other fields of *mip: 
+
+	// We need the dir to obtain the name!
+	// But let's not find the name of root, that causes errors...
+	if(ino > 2) {
+		// Assign a name to this bitch.
+		DIR * dp  = getDir(ip, ino);
+
+		if(dp != -1){
+			printf("Adding a mip name %s, \n", dp->name);
+			strcpy(mip->name, dp->name);
+			minode[i].name[dp->name_len] =0;
+		}
+	}
+     // (6). initialize other fields of *mip:
 
 	mip->ino      = ino; 
 	mip->dev      = dev;
@@ -77,6 +111,97 @@ MINODE *iget(int dev, int ino)
 	mip->mountptr =   0;
 
 	return mip;
+}
+
+
+/**
+ * Takes a inode and its number and returns the parent MINODE pointer.
+ * Is there a more effecient way of doing this?
+ */
+MINODE *getParentNode(INODE * ip, int inum){
+	char *cp;  char temp[256];
+    DIR  *dp;
+    INODE *tempNode;
+
+	int i =0;
+
+	if(inum < 2){
+		printf("Encountered unknown inode\n");
+		return -1;
+	}
+	// Search the given inodes' i_blocks
+	for (i = 0; i < 4; i++)
+	{
+	       	// Convert the i_block[0] to a buff
+	       	get_block(fd, ip->i_block[i], buf);
+	       	cp = buf;
+	       	// Convert the buff to a DIR
+	       	dp = (DIR*)buf;
+
+	       	while(cp < buf + BLOCK_SIZE){
+	      		strncpy(temp, dp->name, dp->name_len);
+	      		temp[dp->name_len] = 0;
+			if (dp->rec_len == 0) { return -1; }
+
+	      	// We have found the parent DIR
+	      	if (strcmp(dp->name, "..") == 0 )
+			{
+				// Convert the inumber to a MINODE, be sure to put this away
+				MINODE* mip = iget(dev,dp->inode);
+				return mip;
+			}
+	      		// move to the next DIR entry:
+	      			cp += (dp->rec_len);   // advance cp by rec_len BYTEs
+	      			dp = (DIR*)cp;     // pull dp along to the next record
+			}
+
+	}
+	return -1;
+}
+
+/**
+ *   Takes an inode and its inumber and returns its corresponding
+ *   dir pointer
+ */
+DIR * getDir(INODE * ip, int inum){
+	char *cp;  char temp[256];
+    DIR  *dp;
+    INODE *tempNode;
+
+
+	int i =0;
+	// Convert the inumber to a MINODE, be sure to put this away
+	MINODE* mip;
+	mip= getParentNode(ip, inum);
+	if (mip == -1) {
+		printf("Error traversing file system \n");
+		return -1;
+	}
+
+	tempNode = &(mip->INODE);
+
+
+    get_block(fd, tempNode->i_block[i], buf);
+    cp = buf;
+    dp = (DIR*)buf;
+
+    while(cp < buf + BLOCK_SIZE){
+    	strncpy(temp, dp->name, dp->name_len);
+    	temp[dp->name_len] = 0;
+    	if (dp->rec_len == 0) {
+    		iput(tempNode);
+			return -1; }
+
+    	if(dp->inode == inum ){
+		//printf("Found the return dir: %s\n", dp->name );
+		iput(tempNode);
+		return dp;
+		      		}
+		// move to the next DIR entry:
+		cp += (dp->rec_len);   // advance cp by rec_len BYTEs
+		dp = (DIR*)cp;
+	}
+
 }
 
 int tst_bit(char *buf, int bit)
