@@ -1,0 +1,1 @@
+cc -m32 utilities.c showblock.c main.c getino.o

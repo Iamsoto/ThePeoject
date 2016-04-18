@@ -1,0 +1,6 @@
+echo > mydisk
+mkfs -b 1024 mydisk 1440
+sudo mount -o loop mydisk mnt
+cc -m32 utilities.c main.c getino.o mkdir_creat.c cd_pwd.c
+
+

@@ -364,7 +364,7 @@ MINODE *getParentNode(INODE * ip, int inum){
 		return 0;
 	}
 	// Search the given inodes' i_blocks
-	for (i = 0; i < 4; i++)
+	for (i = 0; i < 12; i++)
 	{
 	       	// Convert the i_block[0] to a buff
 	       	get_block(fd, ip->i_block[i], buf);
@@ -373,21 +373,27 @@ MINODE *getParentNode(INODE * ip, int inum){
 	       	dp = (DIR*)buf;
 
 	       	while(cp < buf + BLOCK_SIZE){
-	      		strncpy(temp, dp->name, dp->name_len);
-	      		temp[dp->name_len] = 0;
-			if (dp->rec_len == 0) { return 0; }
+			strncpy(temp, dp->name, dp->name_len);
+			temp[dp->name_len] = 0;
+			
+			printf("searching in getParentIno %s\n", temp);
 
-	      	// We have found the parent DIR
-	      	if (strcmp(dp->name, "..") == 0 )
+			if (dp->rec_len == 0) { 
+				printf("encountered a record length of 0 for [%s]\n", temp); 
+				return 0;
+			}
+
+			// We have found the parent DIR
+			if (strcmp(dp->name, "..") == 0 )
 			{
 				// Convert the inumber to a MINODE, be sure to put this away
 				MINODE* mip = iget(dev,dp->inode);
 				return mip;
 			}
-	      		// move to the next DIR entry:
-	      			cp += (dp->rec_len);   // advance cp by rec_len BYTEs
-	      			dp = (DIR*)cp;     // pull dp along to the next record
-			}
+			// move to the next DIR entry:
+				cp += (dp->rec_len);   // advance cp by rec_len BYTEs
+				dp = (DIR*)cp;     // pull dp along to the next record
+		}
 
 	}
 	return 0;
@@ -458,11 +464,9 @@ MINODE *iget(int dev, int ino)
 					INODE *ptr = &(minode[i].INODE);
 					DIR * dp  = (DIR*)getDir(ptr, minode[i].ino );
 					if(dp != 0){
-
-					printf("Adding a mip name %s, \n", dp->name);
-
-					strcpy(minode[i].name, dp->name);
-					minode[i].name[dp->name_len] =0;
+						printf("Adding a mip name %s, \n", dp->name);
+						strcpy(minode[i].name, dp->name);
+						minode[i].name[dp->name_len] =0;
 					}
 				}
 			}

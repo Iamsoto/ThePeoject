@@ -1,0 +1,2 @@
+1. Do we need to look in the double and triple indirect blocks for ls?
+2. Do getino and iget need to be called for every utility function?
