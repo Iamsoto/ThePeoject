@@ -73,7 +73,7 @@ int ialloc(int dev)
 
 	printf("ninodes = %d\n", ninodes);
 	for (i=0; i < ninodes; i++){
-		if (tst_bit(buf, i)==0){
+		if (tst_bit(buf, i) == 0){
 			set_bit(buf,i);
 			decFreeInodes(dev);
 			put_block(dev, bg_inode_table, buf);
@@ -88,32 +88,25 @@ int ialloc(int dev)
 
 int balloc(int dev){
 
-	char *cp;
-	DIR *dp;
-	
-	int num_inodes = sp->s_inodes_count;
-	int current_block = num_inodes + bg_inode_table;
-	get_block(fd, current_block, buf); 
+	int num_blocks = sp->s_blocks_count;
 	int i;
-	
-	for (i = current_block; i < 1440; i++){
-		get_block(fd, i, buf);
-		if (buf[0] == 0){
-			int z;
-			for (z = 0; z < 100; z++){
-				buf[z] = 1;			
-			}
+	int offset = bg_inode_table + (sp->s_inodes_count) / 8;
+	for (i = 0; i < num_blocks; i++){
+		get_block(dev, offset + i, buf);
+		if (tst_bit(buf,i) == 0){
+			set_bit(buf,i);	
 			decFreeBlocks(dev);
-			put_block(dev, current_block, buf);
-			return i;
+			put_block(dev, offset + i, buf);
+			return i+1;
 		}
 	}
-
-	printf("balloc(): no more blocks to allocate\n");
+	printf("balloc(): no more data blocks\n");
 }
 
 int decFreeBlocks(int dev){
 	//decrement free blocks in super and gd
+	
+	char buf[BLKSIZE];
 
 	get_block(dev, 1, buf);
 	sp = (SUPER *)buf;
