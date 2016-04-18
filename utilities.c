@@ -1,7 +1,5 @@
 #include "include.h"
 
-int ninodes;
-
 int iput(MINODE *mip)
 {
 	printf("entering iput\n");
@@ -10,16 +8,16 @@ int iput(MINODE *mip)
 		return;	
 	}
 	mip->refCount--; //decrease refCount by 1
-	if (mip->refCount > 0 && mip->dirty != 1){
+	if (mip->refCount > 0){
 		printf("Case 1 in iput\n");
 		return 0;
 	}
+	strcpy(mip->name, "");
 	if (mip->dirty == 0){
-		strcpy(mip->name, "");
 		printf("Case 2 in iput\n");
 		return 0;
 	}
-	if (mip->refCount > 0 && mip->dirty == 1){
+	if (mip->dirty == 1){
 		printf("Case 3 in iput\n");
 		//must write the INODE back to disk
 		int blk    = (mip->ino - 1) / 8 + bg_inode_table;
@@ -28,16 +26,9 @@ int iput(MINODE *mip)
 
 		ip = (INODE *)buf + offset;
 		*ip = mip->INODE;
-		ip -= offset;
 
-		//memcpy(buf, ip, 1024);
-
-		char *temp_buf_thing = (char*)ip;
-
-		put_block(fd, blk, temp_buf_thing);
-
+		put_block(fd, blk, buf);
 	}
-
 }
 
 int tst_bit(char *buf, int bit)
@@ -69,17 +60,17 @@ int ialloc(int dev)
 	char buf[BLKSIZE];
 
 	// read inode_bitmap block
-	get_block(dev, bg_inode_table, buf);
+	get_block(dev, imap, buf);
 
-	printf("ninodes = %d\n", ninodes);
+	printf("NINODES = %d\n", ninodes);
+	getchar();
+
 	for (i=0; i < ninodes; i++){
-		if (tst_bit(buf, i) == 0){
+		if (tst_bit(buf, i)==0){
 			set_bit(buf,i);
 			decFreeInodes(dev);
-			put_block(dev, bg_inode_table, buf);
+			put_block(dev, imap, buf);
 			return i+1;
-		}else{
-			//printf("bit not free %d\n", i);
 		}
 	}
 	printf("ialloc(): no more free inodes\n");
@@ -88,15 +79,17 @@ int ialloc(int dev)
 
 int balloc(int dev){
 
-	int num_blocks = sp->s_blocks_count;
+	char buf[1024];
+	get_block(dev, bmap, buf);
+
 	int i;
-	int offset = bg_inode_table + (sp->s_inodes_count) / 8;
-	for (i = 0; i < num_blocks; i++){
-		get_block(dev, offset + i, buf);
+
+	for (i = 0; i < nblocks; i++){
 		if (tst_bit(buf,i) == 0){
 			set_bit(buf,i);	
 			decFreeBlocks(dev);
-			put_block(dev, offset + i, buf);
+			put_block(dev, bmap, buf);
+			printf("balloc(): bno = %d\n", i+1);
 			return i+1;
 		}
 	}
@@ -117,6 +110,8 @@ int decFreeBlocks(int dev){
 	gp = (GD *)buf;
 	gp->bg_free_blocks_count--;
 	put_block(dev, 2, buf);
+
+	nblocks--;
 }
 
 int decFreeInodes(int dev)

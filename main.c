@@ -5,6 +5,7 @@
 extern int cd(char *param);
 extern int pwd(char *param);
 
+char *command_name;
 int dev;
 static char *name[128];
 char pathname[128], parameter[128], cwdname[128];
@@ -30,11 +31,12 @@ u32 bg_inode_table;
 
 char buf[BLOCK_SIZE];
 
-	MOUNT *mp;
-	SUPER *sp;
-	//MINODE *ip;
+MOUNT *mp;
 
-int my_mkdir(char *pathname);
+int bmap, imap, inode_start;
+int ninodes, nblocks, ifree, bfree;
+
+extern int mkdir_creat(char *pathname);
 
 int put_block(int fd, int blk, char buf[ ])
 {
@@ -54,7 +56,6 @@ void mountroot()   /* mount root file system */
 	int i, ino;
 
 	char line[64], buf[BLOCK_SIZE], *rootdev;
-	int ninodes, nblocks, ifree, bfree;
 
 	rootdev = "mydisk";
 	
@@ -100,8 +101,8 @@ void mountroot()   /* mount root file system */
 	mp->dev = dev;         
 	mp->busy = BUSY;
 
-	mp->bmap = gp->bg_block_bitmap;
-	mp->imap = gp->bg_inode_bitmap;
+	bmap = mp->bmap = gp->bg_block_bitmap;	
+	imap = mp->imap = gp->bg_inode_bitmap;
 	mp->iblock = gp->bg_inode_table;
 
 	strcpy(mp->name, rootdev);
@@ -281,10 +282,8 @@ int main(int argc, char *argv[ ])
 
 	  init();
 	 
-	  char *function_names[] = {"touch", "chmod", "chown", "chgrp", "ls", "cd", "clear", "open", "mkdir", "pwd", 0};
-	  int (*fptr[])() = {touch, my_chmod, chown, chgrp, ls, cd, clear, my_open, my_mkdir, pwd, 0};
-
-	  ninodes = sp->s_inodes_count;
+	  char *function_names[] = {"touch", "chmod", "chown", "chgrp", "ls", "cd", "clear", "open", "mkdir", "creat", "pwd", 0};
+	  int (*fptr[])() = {touch, my_chmod, chown, chgrp, ls, cd, clear, my_open, mkdir_creat, mkdir_creat, pwd, 0};
 
 	  while(1){
 		printf("P%d running: ", running->pid);
@@ -304,7 +303,7 @@ int main(int argc, char *argv[ ])
 		if (line[0]==0) continue;
 
 		sscanf(line, "%s %s %64c", cname, pathname, parameter);
-
+		command_name = cname;
 		int function_index = search_array(function_names, cname);
 		if (function_index == -1){
 			printf("Yo, the %s command is invalid\n", cname);

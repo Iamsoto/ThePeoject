@@ -7,7 +7,41 @@
 typedef unsigned int u32;
 
 extern int dev;
+//extern static char *name[128];
+extern char pathname[128], parameter[128], cwdname[128];
+extern char names[128][256];
+extern char *command_name;
+
+extern int  nnames;
+extern char *rootdev, *slash, *dot;
+extern int iblock;
+
+extern MINODE *root; 
+extern MINODE minode[NMINODES];
+extern MOUNT  mounttab[NMOUNT];
+extern PROC   proc[NPROC], *running;
+extern OFT    oft[NOFT];
+
+extern MOUNT *getmountp();
+
+extern int DEBUG, nproc;
+
+extern int fd;
+extern u32 bg_inode_table;
+
+extern char buf[BLOCK_SIZE];
+
+extern MOUNT *mp;
+
+extern int bmap, imap, inode_start;
+extern int ninodes, nblocks, ifree, bfree;
+
+/*
+
+extern int dev;
 extern int ninodes;
+extern int nblocks;
+extern int bmap;
 
 extern int print_dir_entries(MINODE *mip);
 extern MINODE *iget(int dev, int ino);
@@ -22,6 +56,8 @@ extern int ialloc(int dev);
 
 extern char buf[BLOCK_SIZE];
 extern MINODE minode[NMINODES];
+
+*/
 
 #endif
 
