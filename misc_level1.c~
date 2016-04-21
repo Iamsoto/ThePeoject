@@ -76,7 +76,7 @@ int my_chmod(){
 
 	for (i = 0; i < 9; i++){
 		printf("%d", nthBit(current->i_mode, abs(6 - i)));
-		//if(i > 0 && i % 3 == 0) putchar(' ');
+		if(i > 0 && i % 3 == 0) putchar(' ');
 	}
 	putchar('\n');
 }

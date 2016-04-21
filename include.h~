@@ -10,6 +10,7 @@ extern int dev;
 //extern static char *name[128];
 extern char pathname[128], parameter[128], cwdname[128];
 extern char names[128][256];
+extern char *command_name;
 
 extern int  nnames;
 extern char *rootdev, *slash, *dot;
@@ -34,6 +35,9 @@ extern MOUNT *mp;
 
 extern int bmap, imap, inode_start;
 extern int ninodes, nblocks, ifree, bfree;
+
+extern int bdealloc(int dev, int bno);
+extern int idealloc(int dev, int ino);
 
 /*
 

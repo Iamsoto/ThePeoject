@@ -32,7 +32,7 @@ int mkdir_creat(char *pathname){
 	int pino = getino(&dev, parent); //3. Get the In_MEMORY minode of parent:
 	MINODE *pip = iget(dev, pino);
 
-	if (pip->INODE.i_mode != 0x41ED){ printf("pip is not a dir!\n"); return; } //Verify : (1). parent INODE is a DIR (HOW?)
+	if (S_ISREG(pip->INODE.i_mode != 0x41ED)){ printf("pip is not a dir!\n"); return; } //Verify : (1). parent INODE is a DIR (HOW?)
 	//(2). child does NOT exists in the parent directory (HOW?);
 	if (search(&pip->INODE, child)){ printf("Child already exists in directory\n"); return; } 
 
@@ -188,7 +188,7 @@ int enter_name(MINODE *pip, int myino, char *myname){
 
 			return;
 		}else{
-			printf("NO space in existing data blocks\n");
+			printf("\n\nNO SPACE IN EXISTING DATA BLOCKS\n\n");
 			getchar();
 		}
 		
@@ -199,16 +199,103 @@ int enter_name(MINODE *pip, int myino, char *myname){
 	//printf("could not link():\n");
 }
 
+int my_rmdir(char *pathname){
+	getchar();
+	int ino = getino(&dev, pathname); //2. get inumber of pathname: determine dev, then  
+	MINODE *mip = iget(dev, ino); //3. get its minode[ ] pointer:
+	/*	  
+	4. check ownership 
+       		super user : OK
+       		not super user: uid must match
+	*/
+	int super_user = 1; //TODO check this later
+	int same_uids = 1; //TODO check this later
+	if (super_user == 1 || same_uids == 1){}
+	//5. check DIR type (HOW?) AND not BUSY (HOW?) AND is empty:
+	int dir_type;
+	int busy;
+	int not_empty = (mip->INODE.i_links_count > 2);
+	//TODO go through its data block(s) to see whether it has any entries in addition to . and .
+	//if (NOT DIR || BUSY || not empty): iput(mip); retunr -1;
+	
+	/*
+		6. ASSUME passed the above checks.
+     		Deallocate its block and inode
+	*/
+	int i;
+	for (i = 0; i < 12; i++){
+		if (mip->INODE.i_block[i]==0)
+			continue;
+		bdealloc(mip->dev, mip->INODE.i_block[i]);
+	}
+	idealloc(mip->dev, mip->ino);
+	iput(mip); //(which clears mip->refCount = 0);
 
-/*
+	//	7. get parent DIR's ino and Minode (pointed by pip);
+	//search(INODE * inodePtr, char * directory_name)
+	getchar();
+	int pino = root->ino;//search(&mip->INODE, "..");
+        MINODE *pip = iget(mip->dev, pino); 
 
-	1. balloc
-	2. enter_name
-*/
+	rm_child(pip, pathname);
 
+	pip->INODE.i_links_count--; //decrement pip's link_count by 1;
+	pip->INODE.i_atime = pip->INODE.i_ctime = time(0L); //touch pip's atime, mtime fields;
+	pip->dirty 	  = 1;
+	iput(pip);
+	return 1;
+}
 
+int rm_child(MINODE *parent, char *name){
+	
+	printf("name in rm_child is %s\n", name);
 
+	char buf[1024];	
 
+	//1. Search parent INODE's data block(s) for the entry of name
+	
+	INODE *inodePtr = &parent->INODE;
+
+	//get the data block of inodePtr
+	int k, i;
+	char *cp;  char temp[256];
+       	DIR  *dp;
+	
+       	// ASSUME INODE *ip -> INODE
+	DIR * next = 0;
+	char found = 0;
+	int stepped = 0;
+	int blk;
+	for (i = 0; i < 12; i++)
+	{	
+		if (found == 1) break;
+	       	//printf("i_block[%d] = %d\n", i, inodePtr->i_block[i]); // print blk number
+	       	get_block(fd, inodePtr->i_block[i], buf);     // read INODE's i_block[0]
+	       	cp = buf;  
+	       	dp = (DIR*)buf;
+	       	while(cp < buf + BLKSIZE){
+			stepped++;
+			printf("Searching for %s\n", name);
+	      		strncpy(temp, dp->name, dp->name_len);
+	      		temp[dp->name_len] = 0;
+	      		//printf("%.4d  %.4d  %.4d  [%s]\n", dp->inode, dp->rec_len, dp->name_len, temp);
+			//printf("comparing [%s] and [%s]\n", temp, s);
+			if (strcmp(name, temp) == 0)
+			{
+				printf("Found %s\n", temp); found = 1;	
+				break;			
+			}else if (dp->rec_len == 0) { break; }
+	      		// move to the next DIR entry:
+	      		cp += (dp->rec_len);   // advance cp by rec_len BYTEs
+	      		dp = (DIR*)cp;     // pull dp along to the next record
+	       	}
+	}
+	
+	DIR *current = dp;
+	next = dp + dp->rec_len;
+	memmove(current, next, current->rec_len);
+	put_block(dev, blk, 0);
+}
 
 
 

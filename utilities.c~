@@ -1,5 +1,8 @@
 #include "include.h"
 
+extern int bdealloc(int dev, int bno);
+extern int idealloc(int dev, int ino);
+
 int iput(MINODE *mip)
 {
 	printf("entering iput\n");
@@ -96,6 +99,50 @@ int balloc(int dev){
 	printf("balloc(): no more data blocks\n");
 }
 
+int bdealloc(int dev, int bno){
+	char buf[1024];
+	get_block(dev, bno, buf); //get the block we need
+	memset(buf, 0, 1024);	//set it all to 0's
+	put_block(dev, bno, buf); //write the 0's back
+	
+	//reset bmap
+}
+
+int idealloc(int dev, int ino){
+	
+	char buf[1024];
+	int blk = (ino - 1) / 8 + bg_inode_table;
+	int offset = (ino - 1) % 8;
+	get_block(dev, blk, buf);
+	INODE *found_ino = (INODE*)buf + offset;
+
+	//clear its data blocks
+
+	memset(buf, 0, 1024);
+
+	int i;
+	for (i = 0; i < EXT2_N_BLOCKS; i++){
+		if (found_ino->i_block[i] == 0){
+			continue;
+		}
+		//we need to deallocate
+		put_block(dev, found_ino->i_block[i], buf);
+	}
+	
+	//deallocate found_ino
+
+	get_block(dev, blk, buf);
+	found_ino = (INODE*)buf + offset;
+	found_ino = 0;
+	put_block(dev, blk, buf);
+
+	//get the imap
+
+	get_block(fd, imap, buf);
+	set_bit(buf, ino-1); //clear the imap at ino	
+	put_block(fd, imap, buf);  //write back the new imap
+}
+
 int decFreeBlocks(int dev){
 	//decrement free blocks in super and gd
 	
@@ -165,7 +212,9 @@ int findmyname(MINODE *parent, int myino, char *myname)
 
 int print_dir_entries(MINODE *mip)
 {
-	printf("Printing dir entries\n");
+	char temp_name[256];
+	strcpy(temp_name, mip->name); 
+	printf("Printing dir entries for %s\n", temp_name);
 	int i; 
 	char *cp, sbuf[BLKSIZE];
 	DIR *dp;
@@ -211,7 +260,6 @@ int findino(MINODE *mip, int *myino, int *parentino)
 
 int search(INODE * inodePtr, char * directory_name)
 {
-	
 	//get the data block of inodePtr
 	printf("===================================\n");
 	int k, i;
@@ -227,8 +275,9 @@ int search(INODE * inodePtr, char * directory_name)
 	       	cp = buf;  
 	       	dp = (DIR*)buf;
 	       	while(cp < buf + BLKSIZE){
-					printf("Searching for %s\n", directory_name);
-	      		strncpy(temp, dp->name, dp->name_len);
+			printf("Searching for %s\n", directory_name);
+			getchar();	      		
+			strncpy(temp, dp->name, dp->name_len);
 	      		temp[dp->name_len] = 0;
 	      		//printf("%.4d  %.4d  %.4d  [%s]\n", dp->inode, dp->rec_len, dp->name_len, temp);
 			//printf("comparing [%s] and [%s]\n", temp, directory_name);
@@ -360,7 +409,7 @@ MINODE *getParentNode(INODE * ip, int inum){
 	int i =0;
 
 	if(inum < 2){
-		printf("Encountered unknown inode\n");
+		printf("Encountered unknown inode %d\n", inum);
 		return 0;
 	}
 	// Search the given inodes' i_blocks
@@ -444,6 +493,7 @@ DIR * getDir(INODE * ip, int inum){
 
 MINODE *iget(int dev, int ino)
 {
+	char temp_name[256];
 	printf("Entering iget\n");
 	/*
 	(1). Search minode[i] for an entry whose refCount > 0 with the SAME (dev,ino)
@@ -464,11 +514,12 @@ MINODE *iget(int dev, int ino)
 					INODE *ptr = &(minode[i].INODE);
 					DIR * dp  = (DIR*)getDir(ptr, minode[i].ino );
 					if(dp != 0){
-
-					printf("Adding a mip name %s, \n", dp->name);
-
-					strcpy(minode[i].name, dp->name);
-					minode[i].name[dp->name_len] =0;
+						strncpy(temp_name, dp->name, dp->name_len);
+						temp_name[dp->name_len] = 0;
+						printf("The directory namelength is: %d\n", dp->name_len);
+						printf("Adding a mip name %s, \n", temp_name);
+						strcpy(minode[i].name, temp_name);
+						//minode[i].name[dp->name_len] =0;
 					}
 				}
 			}
@@ -491,11 +542,9 @@ MINODE *iget(int dev, int ino)
 
     /*  (4). read blk into buf[ ]; 	*/
 
-	printf("Getting block %d with offset %d from file descriptor %d\n", blk, offset, fd);
+	printf("Getting block %d with offset %d from file descriptor %d with ino_num = %d\n", blk, offset, fd, ino);
 	get_block(fd, blk, buf);
 	INODE *ip = (INODE *)buf + offset;
-
-	
 	
       //(5). COPY *ip into mip->INODE
 
@@ -509,9 +558,11 @@ MINODE *iget(int dev, int ino)
 		DIR * dp  = getDir(ip, ino);
 
 		if(dp != 0){
-			printf("Adding a mip name %s, \n", dp->name);
-			strcpy(mip->name, dp->name);
-			minode[i].name[dp->name_len] =0;
+			strncpy(temp_name, dp->name, dp->name_len);
+			printf("The directory namelength is: %d\n", dp->name_len);
+			temp_name[dp->name_len] = 0;
+			printf("Adding a mip name %s, \n", temp_name);
+			strcpy(mip->name, temp_name);
 		}
 	}
      // (6). initialize other fields of *mip:
@@ -524,6 +575,8 @@ MINODE *iget(int dev, int ino)
 	mip->mounted  =   0;
 	mip->mountptr =   0;
 
+	printf("exiting iget\n");
+	
 	return mip;
 }
 

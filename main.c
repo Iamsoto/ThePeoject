@@ -37,6 +37,9 @@ int bmap, imap, inode_start;
 int ninodes, nblocks, ifree, bfree;
 
 extern int mkdir_creat(char *pathname);
+extern int my_open(char *pathname);
+extern int my_rmdir(char *pathname);
+extern int my_chmod(char *pathname);
 
 int put_block(int fd, int blk, char buf[ ])
 {
@@ -195,7 +198,6 @@ int search_array(char *function_names[], char *s)
 }
 
 int touch(char *param){}
-int my_chmod(char *param){}
 int chown(char *param){}
 int chgrp(char *param){}
 
@@ -228,7 +230,7 @@ int ls(char *path)
 	printf("start_location ino = %d\n", current_location->ino);
 	printf("start_location dev = %d\n", current_location->dev);
 
-	int blk, offset, return_ino;
+	int blk, offset, return_ino = current_location->ino;
 	char *current_part = "";
 	while (current_part = (char*)parse_pathname(path)){	
 		//printf("Found current_inode = %.8x\n", current_inode);
@@ -266,10 +268,6 @@ int clear(){
 	}
 }
 
-int my_open(){
-	return 0;
-}
-
 int main(int argc, char *argv[ ]) 
 {
 	  int i,cmd; 
@@ -282,8 +280,8 @@ int main(int argc, char *argv[ ])
 
 	  init();
 	 
-	  char *function_names[] = {"touch", "chmod", "chown", "chgrp", "ls", "cd", "clear", "open", "mkdir", "creat", "pwd", 0};
-	  int (*fptr[])() = {touch, my_chmod, chown, chgrp, ls, cd, clear, my_open, mkdir_creat, mkdir_creat, pwd, 0};
+	  char *function_names[] = {"touch", "chmod", "chown", "chgrp", "ls", "cd", "clear", "open", "mkdir", "creat", "pwd", "rmdir", 0};
+	  int (*fptr[])() = {touch, my_chmod, chown, chgrp, ls, cd, clear, my_open, mkdir_creat, mkdir_creat, pwd, my_rmdir, 0};
 
 	  while(1){
 		printf("P%d running: ", running->pid);
@@ -309,6 +307,8 @@ int main(int argc, char *argv[ ])
 			printf("Yo, the %s command is invalid\n", cname);
 		}
 		else{
+			printf("getting function at index %d\n", function_index);
+			getchar();
 			int return_val = fptr[function_index](pathname, parameter);
 		}
 	  }
