@@ -1,11 +1,13 @@
 #include "include.h"
 /* a/b/c */
 
+DIR *last_entry(int blk, int print);
+
 int InodeHasDirectory(INODE *cur_inode, char *path){
 	if (!cur_inode) return 0;	
 	char buf[1024];
-	char *s;
-	while (s = parse_pathname(path, "/")){
+	char *s = "";
+	while (s = (char*)parse_pathname(path, "/")){
 		int cur_ino = search(cur_inode, s);
 		if (cur_ino == 0){
 			return 0;
@@ -20,19 +22,30 @@ int InodeHasDirectory(INODE *cur_inode, char *path){
 
 int mkdir_creat(char *pathname){
 	int dir  = (strcmp(command_name,"mkdir") == 0);
+	
+	if (dir == 0){
+		printf("making a file\n"); 
+	}else{
+		printf("making a directory\n");
+	}
+	
 	MINODE *mip = root; // 1. pahtname = "/a/b/c" start mip = root;         dev = root->dev;
 
 	if (*pathname != '/'){ mip = running->cwd; } // if pathname =  "a/b/c" start mip = running->cwd; dev = running->cwd->dev;
 
 	dev = mip->dev;
 
+	char temp_pathname[256];
+	strcpy(temp_pathname, pathname);
 	char *parent = dirname(pathname); //2. Let parent = dirname(pathname);   parent= "/a/b" OR "a/b"
-	char *child  = basename(pathname); //child  = basename(pathname);  child = "c"
+	char *child  = basename(temp_pathname); //child  = basename(pathname);  child = "c"
+	
+	printf("parent = %s child = %s\n", parent, child);
 
 	int pino = getino(&dev, parent); //3. Get the In_MEMORY minode of parent:
 	MINODE *pip = iget(dev, pino);
 
-	if (S_ISREG(pip->INODE.i_mode != 0x41ED)){ printf("pip is not a dir!\n"); return; } //Verify : (1). parent INODE is a DIR (HOW?)
+	if (S_ISREG(pip->INODE.i_mode)){ printf("pip is not a dir!\n"); return; } //Verify : (1). parent INODE is a DIR (HOW?)
 	//(2). child does NOT exists in the parent directory (HOW?);
 	if (search(&pip->INODE, child)){ printf("Child already exists in directory\n"); return; } 
 
@@ -68,8 +81,10 @@ int mymkdir(MINODE *pip, char *name, int pino, int dir){
 	INODE *ip = &mip->INODE;
 
 	/*Set all of the MINODE and INOE properties*/
+	//drwxr-xr-x
 	ip->i_mode 	  = 0x41ED; 
 	if (dir == 0) { ip->i_mode = 0x81A4; }
+	printf("i_mode set to %x\n", ip->i_mode);
 	ip->i_uid    	  = running->uid;
 	ip->i_gid  	  = running->gid;
 	ip->i_size	  = 1024;
@@ -123,7 +138,7 @@ int mymkdir(MINODE *pip, char *name, int pino, int dir){
 }
 
 int ideal_len(int n){
-	return (8 + n + 3);
+	return 4 * ((8 + n + 3) / 4);
 }
 
 int enter_name(MINODE *pip, int myino, char *myname){
@@ -200,6 +215,11 @@ int enter_name(MINODE *pip, int myino, char *myname){
 }
 
 int my_rmdir(char *pathname){
+	if(strcmp(pathname, ".") == 0 || strcmp(pathname, "..") == 0){
+		printf("You cannot delete this folder KC, nice try!\n");
+		return 0;
+	}
+	 
 	getchar();
 	int ino = getino(&dev, pathname); //2. get inumber of pathname: determine dev, then  
 	MINODE *mip = iget(dev, ino); //3. get its minode[ ] pointer:
@@ -212,11 +232,39 @@ int my_rmdir(char *pathname){
 	int same_uids = 1; //TODO check this later
 	if (super_user == 1 || same_uids == 1){}
 	//5. check DIR type (HOW?) AND not BUSY (HOW?) AND is empty:
-	int dir_type;
-	int busy;
+	int dir_type = mip->INODE.i_mode == 0x41ED;
+	int busy = 0;
 	int not_empty = (mip->INODE.i_links_count > 2);
 	//TODO go through its data block(s) to see whether it has any entries in addition to . and .
-	//if (NOT DIR || BUSY || not empty): iput(mip); retunr -1;
+	
+	DIR *last = (DIR*)print_dir_entries(mip, 1);
+	
+	//printf("last = %x\n", last);
+
+	if (last != 0) 
+	{
+		char last_name[6];
+		strncpy(last_name, last->name, last->name_len);
+		last_name[last->name_len] = 0;
+		if (strcmp(last_name, "..") != 0 && strcmp(last_name, "lost+found") != 0)
+		{
+			printf("not empty, last name is %s\n", last_name);
+			not_empty = 1;
+		}
+	}
+	else{
+		not_empty = 0;
+	}
+	
+	/*
+	
+	not_empty = 0;
+	if (!dir_type || busy || not_empty){
+		printf("invalid, returning\n");
+		printf("dir_type = %d , imode = %x BUSY = %d not_empty = %d\n", dir_type, mip->INODE.i_mode, busy, not_empty);
+		iput(mip); 
+		return -1;
+	}*/
 	
 	/*
 		6. ASSUME passed the above checks.
@@ -239,6 +287,8 @@ int my_rmdir(char *pathname){
 
 	rm_child(pip, pathname);
 
+	printf("got to line 265\n");
+
 	pip->INODE.i_links_count--; //decrement pip's link_count by 1;
 	pip->INODE.i_atime = pip->INODE.i_ctime = time(0L); //touch pip's atime, mtime fields;
 	pip->dirty 	  = 1;
@@ -259,18 +309,18 @@ int rm_child(MINODE *parent, char *name){
 	//get the data block of inodePtr
 	int k, i;
 	char *cp;  char temp[256];
-       	DIR  *dp;
+       	DIR  *dp, *last = dp, *previous;
 	
        	// ASSUME INODE *ip -> INODE
-	DIR * next = 0;
 	char found = 0;
 	int stepped = 0;
-	int blk;
+	int blk, bts = 0;
 	for (i = 0; i < 12; i++)
 	{	
 		if (found == 1) break;
 	       	//printf("i_block[%d] = %d\n", i, inodePtr->i_block[i]); // print blk number
-	       	get_block(fd, inodePtr->i_block[i], buf);     // read INODE's i_block[0]
+		blk = inodePtr->i_block[i];
+	       	get_block(fd, blk, buf);     // read INODE's i_block[0]
 	       	cp = buf;  
 	       	dp = (DIR*)buf;
 	       	while(cp < buf + BLKSIZE){
@@ -278,24 +328,95 @@ int rm_child(MINODE *parent, char *name){
 			printf("Searching for %s\n", name);
 	      		strncpy(temp, dp->name, dp->name_len);
 	      		temp[dp->name_len] = 0;
-	      		//printf("%.4d  %.4d  %.4d  [%s]\n", dp->inode, dp->rec_len, dp->name_len, temp);
-			//printf("comparing [%s] and [%s]\n", temp, s);
 			if (strcmp(name, temp) == 0)
 			{
 				printf("Found %s\n", temp); found = 1;	
 				break;			
 			}else if (dp->rec_len == 0) { break; }
-	      		// move to the next DIR entry:
+			previous = dp;
 	      		cp += (dp->rec_len);   // advance cp by rec_len BYTEs
+			bts += dp->rec_len;
 	      		dp = (DIR*)cp;     // pull dp along to the next record
 	       	}
 	}
+
+	//last, middle, first
 	
-	DIR *current = dp;
-	next = dp + dp->rec_len;
-	memmove(current, next, current->rec_len);
-	put_block(dev, blk, 0);
+	if (stepped > 1 && cp + (dp->rec_len) < buf + BLKSIZE){
+		show_dir(blk);
+
+		printf("not the first one\n");
+		
+		strncpy(temp, dp->name, dp->rec_len);
+		temp[dp->rec_len] = 0;
+		printf("to delete: %s rec_len:%d name_len:%d\n", temp, dp->rec_len, dp->name_len);
+
+		int deleted_len = dp->rec_len;
+		cp = (char*)dp;
+		cp += dp->rec_len;
+		DIR * next = (DIR*)cp;
+		
+		//printf("next has address %x\n", next);
+
+		strncpy(temp, next->name, next->name_len);
+		temp[next->rec_len] = 0;
+		printf("next is %s with rec_len:%d and name_len:%d\n", temp, next->rec_len, next->name_len);
+
+		printf("finding the last one\n");
+		last = next;
+		char *cq = (char*)last;
+		while(cq < buf + BLKSIZE){
+			last = (DIR*)cq;
+			cq += last->rec_len;
+		}
+
+		//print the name of the last entry
+		strncpy(temp, last->name, last->name_len);
+		temp[last->name_len] = 0;
+		printf("last entry = %s\n", temp);
+	
+		int bytes = 1024 - bts;
+		last->rec_len += deleted_len;
+		printf("copying bytes = %d\n", bytes);
+		memcpy(dp, next, bytes);
+
+		printf("writing to block %d on fd %d\n", blk, fd);
+		put_block(fd, blk, buf);
+
+		show_dir(blk);
+	}else{
+		//this is when the dir entry to delete 
+		//is the last one
+		
+		//print the previous 
+		
+		printf("the item to delete is the last one\n");
+		
+		strncpy(temp, previous->name, previous->name_len);
+		temp[previous->name_len] = 0;
+		printf("previous is %s\n", temp); 
+		
+		//print the current
+		
+		strncpy(temp, dp->name, dp->name_len);
+		temp[dp->name_len] = 0;
+		printf("to_delete is %s\n", temp);
+		
+		
+		int deleted_len = dp->rec_len;
+		int bytes = 1024 - bts;
+		previous->rec_len += deleted_len;
+		//cp = previous;
+		memcpy(dp, previous, deleted_len);
+		put_block(fd, blk, buf);
+		//make previous occupy all the space 
+	}
 }
+
+
+
+
+
 
 
 

@@ -2,10 +2,18 @@
 
 /************************ globals *****************************/
 
+char *t1 = "xwrxwrxwr-------";
+char *t2 = "----------------";
+
 extern int cd(char *param);
 extern int pwd(char *param);
+extern char * totalPath();
 
 char *command_name;
+
+char the_buf2[1024] = { 0 };
+char completePath[1024];
+
 int dev;
 static char *name[128];
 char pathname[128], parameter[128], cwdname[128];
@@ -37,9 +45,18 @@ int bmap, imap, inode_start;
 int ninodes, nblocks, ifree, bfree;
 
 extern int mkdir_creat(char *pathname);
-extern int my_open(char *pathname);
+extern int laopen_file(char *pathname, char* str_mode );
+extern int laclose_file(int fd);
 extern int my_rmdir(char *pathname);
 extern int my_chmod(char *pathname);
+extern int chown();
+extern int touch(char *pathname);
+extern int my_write();
+extern int laread(int fd,char buf[], int nbytes);
+extern int my_cat(char *pathname);
+extern int link();
+extern MINODE *getParentNode(INODE * ip, int inum);
+extern MINODE *getParentMinode(INODE * ip, int inum);
 
 int put_block(int fd, int blk, char buf[ ])
 {
@@ -197,68 +214,178 @@ int search_array(char *function_names[], char *s)
 	return -1;
 }
 
-int touch(char *param){}
-int chown(char *param){}
 int chgrp(char *param){}
 
-int ls(char *path)
-{
-	printf("bg_inode_table = %d\n", bg_inode_table);
-	//search to see if the inode is in memory or not
-	//if it isn't, bring it to memory
-	//in ls a/b/c bring c to memory if it isn't already
-	int count;
-	int i;
-	
-	//from root or from cwd?
+int parse(char *param){
+	char *s;
+	while (s = (char*)parse_pathname(param, 0)){
+		printf("[%s]\n", s);
+	}
+}
 
-	int from_root = 1;
-	if (*path != '/') from_root = 0;
+int ls_format(char * name, INODE* inode){
 
-	MINODE *current_location = root;
-	if (!from_root){
-		current_location = running->cwd;
+	//struct stat fstat, *sp;
+	int r, i;
+	char ftime[64];
+
+	//sp = &fstat;
+	//printf("name=%s\n", fname); getchar();
+
+	if ((inode->i_mode & 0xF000) == 0x8000){
+		//printf(ANSI_COLOR_BLUE);
+		printf("%c",'f');
 	}
 
-	//go inside every MINODE, get the INODE, search
-	//its data blocks for the next entry to be found
-	//if it isn't found, print this
+	if ((inode->i_mode & 0xF000) == 0x4000){
 
-	INODE *current_inode = &(current_location->INODE);
+		printf("%c",'d');
+	}
+	if ((inode->i_mode & 0xF000) == 0xA000){
+		//printf(ANSI_COLOR_RED);
+		printf("%c",'l');
+	}
 
-	printf("start_location = %s\n", current_location->name);
-	printf("start_location ino = %d\n", current_location->ino);
-	printf("start_location dev = %d\n", current_location->dev);
+	//printf("imode before shifting is %d\n", inode->i_mode);
+	
+	unsigned int permissions = (inode->i_mode << 7) >> 7;
+	/*
+	for (i = 15; i >= 0; i--){
+		printf("%d", (permissions & (1 << i)) >> i);
+	}*/
+	
+	//printf(" permissions are %hd ", permissions);
+	
+	for (i=8; i >= 0; i--){
+		char *bts = "rwx";
+		int cur_bt = (permissions & (1 << i)) >> i;
+		//printf("%d", cur_bt);	
+		if (cur_bt == 0) putchar('-');
+		else{
+			printf("%c", bts[(i + 1) % 3]);
+		}
+	}
 
-	int blk, offset, return_ino = current_location->ino;
-	char *current_part = "";
-	while (current_part = (char*)parse_pathname(path)){	
-		//printf("Found current_inode = %.8x\n", current_inode);
-		printf("current_part = [%s]\n", current_part);
-		char other_temp[256];
-		strcpy(other_temp, current_part);
-		return_ino = search(current_inode, other_temp);
-		if (return_ino == 0){
-			printf("could not find %s\n", current_part);return;		
-		}else{
-			printf("Found inode %d for %s\n", return_ino, current_part);
+
+	  printf("%4d ",inode->i_links_count);
+	  printf("%4d ",inode->i_gid);
+	  printf("%4d ",inode->i_uid);
+	  printf("%8d ",inode->i_size);
+
+
+
+/*	  // print time - not working
+	  strcpy(ftime, inode->i_ctime);
+	  ftime[strlen(ftime)-1] = 0;
+	  printf("%s  ",ftime);
+	  return 0;*/
+	  // print name
+	  printf("%s", name);
+
+
+	  printf("\n");
+}
+
+
+/**
+ * A revamped LS command...
+ *
+ * TODO: Double & indirect blocks
+ */
+ 
+int ls2(char *path){
+	// Variables
+	MINODE *mip_to_list = 0;
+	char full_path[224] = { 0 };
+	char the_buf[1024]= { 0 };
+	char * cp= 0;
+	DIR * dp;
+	DIR * dp2;
+	char temp_name[100] = { 0 };
+
+	printf("************* LS 9000 ****************\n");
+	printf("*************          ***************\n");
+
+	// If search path from root
+	if (path[0] == '/'){
+
+		int ino = getino(&dev, path);
+		mip_to_list = iget(dev,ino);
+	}
+	else { // Obtain path from current directory
+
+		strcpy(full_path, totalPath());
+
+		if((strcmp(path, "") !=0) && (strcmp(path, " ") !=0)){
+			strcat(full_path, "/");
+			strcat(full_path, path);
+		}
+		int ino = getino(&dev, full_path);
+		mip_to_list = iget(dev,ino);
+	}
+
+
+	int i =0;
+	for(i=0; i< 12; i++){ // Search i_blocks of mip_To_list
+
+		if(mip_to_list->INODE.i_block[i] == 0){
+			printf("End ls\n");
+			return 0;
 		}
 
-		//return_ino is valid
-		blk = (return_ino - 1) / 8 + bg_inode_table;
-		offset = (return_ino - 1) % 8;
-		printf("block %d offset %d\n", blk, offset);
-		get_block(fd, blk, buf);
-		current_inode = (INODE*)buf + offset;
+		// Obtain The block that contains the dirs
+		get_block(fd, mip_to_list->INODE.i_block[i], the_buf);
+
+
+		cp = the_buf;
+		dp = (DIR *)the_buf;
+		if (dp->rec_len == 0){return 0;}
+
+		/*
+		// Skip Self
+		cp += dp->rec_len;
+		dp = (DIR *)cp;
+		if (dp->rec_len == 0){ return 0; }
+		// Skip Parent
+		cp += dp->rec_len;
+		dp = (DIR *)cp;
+		*/
+
+		// Traverse all directories in this block
+		while (cp < the_buf + BLKSIZE){
+			if (dp->rec_len == 0){
+
+				return 0;
+			}
+
+			// Now to find the actual Inode of the directory
+			int cur_blk    = (dp->inode - 1) / 8 + bg_inode_table;
+			int cur_offset = (dp->inode - 1) % 8;
+
+
+			char tempy[50] = { 0 };
+			strncpy(tempy,dp->name, dp->name_len);
+			tempy[dp->name_len] = 0;
+
+			get_block( dev, cur_blk, the_buf2);
+
+			INODE * dip = 0;
+			dip = (INODE *)the_buf2 + cur_offset;
+
+
+			strncpy(temp_name, dp->name, dp->name_len);
+			temp_name[dp->name_len] = 0;
+
+			// Format the output
+			//printf(ANSI_COLOR_CYAN);
+			ls_format(temp_name, dip);
+			//printf(ANSI_COLOR_RESET);
+
+			cp += dp->rec_len;
+			dp = (DIR *)cp;
+		}
 	}
 
-	//we have the inode we want to print
-	
-	//printf("Found current_inode = %.8x\n", current_inode);
-
-	MINODE *mip = iget(dev, return_ino);
-	mip->INODE = *current_inode;
-	print_dir_entries(mip);			
 }
 
 int clear(){
@@ -270,32 +397,35 @@ int clear(){
 
 int main(int argc, char *argv[ ]) 
 {
-	  int i,cmd; 
-	  char line[128], cname[64];
+	//system("color 02");
+	int i,cmd; 
+	char line[128], cname[64];
 
-	  if (argc>1){
-	    if (strcmp(argv[1], "-d")==0)
-		DEBUG = 1;
-	  }
+	if (argc>1){
+		if (strcmp(argv[1], "-d")==0)
+			DEBUG = 1;
+	}
 
-	  init();
-	 
-	  char *function_names[] = {"touch", "chmod", "chown", "chgrp", "ls", "cd", "clear", "open", "mkdir", "creat", "pwd", "rmdir", 0};
-	  int (*fptr[])() = {touch, my_chmod, chown, chgrp, ls, cd, clear, my_open, mkdir_creat, mkdir_creat, pwd, my_rmdir, 0};
+	init();
 
-	  while(1){
+	char *function_names[] = {"touch", "chmod", "chown", "chgrp", "ls", "cd", "clear", "open", "mkdir", "creat", "pwd", "rmdir", "write", "cat", "parse", "link", 0};
+	int (*fptr[])() = {touch, my_chmod, chown, chgrp, ls2, cd, clear, laopen_file, mkdir_creat, mkdir_creat, pwd, my_rmdir, my_write, my_cat, parse, link, 0};
+
+	//test_write();
+
+	while(1){
 		printf("P%d running: ", running->pid);
 
 		/* zero out pathname, parameter */
 		for (i=0; i<64; i++){
-		  pathname[i]=parameter[i] = 0;
+			pathname[i]=parameter[i] = 0;
 		}      
 		/* these do the same; set the strings to 0 */
 		memset(pathname, 0, 64);
 		memset(parameter,0, 64);
 
 		printf("input command : ");
-		
+
 		fgets(line,128,stdin);
 		line[strlen(line)-1]=0;
 		if (line[0]==0) continue;
@@ -311,7 +441,7 @@ int main(int argc, char *argv[ ])
 			getchar();
 			int return_val = fptr[function_index](pathname, parameter);
 		}
-	  }
+	}
 
 } /* end main */
 

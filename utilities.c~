@@ -236,7 +236,7 @@ int print_dir_entries(MINODE *mip)
 		cp = sbuf;
 		while (cp < sbuf + BLKSIZE){			  	
 			printf("inode=%.4d rec_len=%.4d name_len=%.4d name=%s\n", dp->inode, dp->rec_len, dp->name_len, dp->name);
-			if (dp->rec_len == 0) return;
+			if (dp->rec_len == 0) return 0;
 			// print dp->inode, dp->rec_len, dp->name_len, dp->name);
 		  	// WRITE YOUR CODE TO search for name: return its ino if found
 			//int name_ino_num = search_inode(ip, "asdads");
@@ -276,7 +276,7 @@ int search(INODE * inodePtr, char * directory_name)
 	       	dp = (DIR*)buf;
 	       	while(cp < buf + BLKSIZE){
 			printf("Searching for %s\n", directory_name);
-			getchar();	      		
+			//getchar();	      		
 			strncpy(temp, dp->name, dp->name_len);
 	      		temp[dp->name_len] = 0;
 	      		//printf("%.4d  %.4d  %.4d  [%s]\n", dp->inode, dp->rec_len, dp->name_len, temp);
@@ -297,93 +297,13 @@ int search(INODE * inodePtr, char * directory_name)
 	return 0;
 }
 
-char *parse_pathname(char *pathname){
-	static int location = 0;
-	if (location >= strlen(pathname)) return 0;
-
-	int i = location;
-	char found = 0;
-
-	char piece[256];
-
-	while (pathname[i]){
-		if (pathname[i] == '/'){
-			i++; //increment i to make it point after the end
-			found = 1;
-			break;
-		}
-		else{
-			piece[i - location] = pathname[i]; //copy 1 byte
-		}
-		i++;
-	}
-	
-	if (!(pathname[i])) i++;
-	piece[i - location - 1] = 0;
-	location = i;
-	
-	char *piece_pointer = piece;
-
-	return piece_pointer;
-}
-
-
-
-/*
-
-MINODE *iget(int dev, int ino)
-{
-	
-	//(1). Search minode[i] for an entry whose refCount > 0 with the SAME (dev,ino)
-     	//     if found: refCount++; mip-return &minode[i];
-	//(2). Find a minode[i] whose refCount = 0 => let MINODE *mip = &minode[i];
-	
-
-	MINODE *mip = 0;
-	int i;
-	for (i = 0; i < NMINODES; i++)
-	{
-		if (minode[i].dev == dev && minode[i].ino == ino){
-			minode[i].refCount++;
-			return &minode[i];
-		}else if (minode[i].refCount == 0 && mip == 0){
-			mip = &(minode[i]);
-			printf("Found minode at index %d\n", i);		
-		}	
-	}
-
-      //(3). Use Mailman's algorithm to compute
-
-	printf("bg_inode_table = %d\n", bg_inode_table);
-
-	int blk = (ino - 1) / 8 + bg_inode_table;
-	int offset = (ino - 1) % 8;
-
-    //  (4). read blk into buf[ ]; 	
-
-	printf("Getting block %d with offset %d from file descriptor %d\n", blk, offset, fd);
-	get_block(fd, blk, buf);
-	INODE *ip = (INODE *)buf;
-	ip += offset;
-
-      //(5). COPY *ip into mip->INODE
-
-	mip->INODE = *ip;
-
-     // (6). initialize other fields of *mip: 
-
-	mip->ino      = ino; 
-	mip->dev      = dev;
-
-	mip->refCount =   1;
-	mip->dirty    =   0;
-	mip->mounted  =   0;
-	mip->mountptr =   0;
-
-	return mip;
-}
-
+/* Like iget but does not store inode into memory
 */
+INODE * inodeGet(){
+	
+}
+
+
 
 int search_minode(MINODE *mip, char *directory_name)
 {
@@ -397,16 +317,20 @@ int search_minode(MINODE *mip, char *directory_name)
 	return -1;
 }
 
+
+
 /**
  * Takes a inode and its number and returns the parent MINODE pointer.
  * Is there a more effecient way of doing this?
  */
-MINODE *getParentNode(INODE * ip, int inum){
+MINODE *getParentMinode(INODE * ip, int inum){
 	char *cp;  char temp[256];
     DIR  *dp;
     INODE *tempNode;
 
-	int i =0;
+    printf("Get parent inode for inumber %d\n", inum);
+
+    int i =0;
 
 	if(inum < 2){
 		printf("Encountered unknown inode %d\n", inum);
@@ -415,25 +339,34 @@ MINODE *getParentNode(INODE * ip, int inum){
 	// Search the given inodes' i_blocks
 	for (i = 0; i < 12; i++)
 	{
+
 	       	// Convert the i_block[0] to a buff
 	       	get_block(fd, ip->i_block[i], buf);
+	       	printf("the ip->i_block I get is: %d\n", ip->i_block[i]);
 	       	cp = buf;
 	       	// Convert the buff to a DIR
 	       	dp = (DIR*)buf;
 
 	       	while(cp < buf + BLOCK_SIZE){
-			strncpy(temp, dp->name, dp->name_len);
-			temp[dp->name_len] = 0;
-			
-			printf("searching in getParentIno %s\n", temp);
 
-			if (dp->rec_len == 0) { 
-				printf("encountered a record length of 0 for [%s]\n", temp); 
+
+	       	strncpy(temp, dp->name, dp->name_len);
+
+			temp[dp->name_len] = 0;
+
+
+			printf("Searching in getParentIno name %s\n", temp);
+			printf("Searched inode's rec length is: %d, "
+					"its name_length is: %d\n ", dp->rec_len, dp->name_len );
+
+
+			if (dp->rec_len == 0) {
+				printf("encountered a record length of 0 for [%s]\n", temp);
 				return 0;
 			}
 
 			// We have found the parent DIR
-			if (strcmp(dp->name, "..") == 0 )
+			if (strcmp(temp, "..") == 0 )
 			{
 				// Convert the inumber to a MINODE, be sure to put this away
 				MINODE* mip = iget(dev,dp->inode);
@@ -443,30 +376,102 @@ MINODE *getParentNode(INODE * ip, int inum){
 				cp += (dp->rec_len);   // advance cp by rec_len BYTEs
 				dp = (DIR*)cp;     // pull dp along to the next record
 		}
-
 	}
 	return 0;
 }
 
-DIR * getDir(INODE * ip, int inum){
+
+
+
+/**
+ * Takes a inumber and returns the parent MINODE pointer.
+ *
+ * UPDATE: Now returns an INODE as opposed to minode
+ */
+INODE *getParentNode(INODE * ip, int inum){
 	char *cp;  char temp[256];
+	char *buf2[BLKSIZE] = { 0 };
     DIR  *dp;
     INODE *tempNode;
 
+    printf("Get parent inode for inumber %d\n", inum);
 
-	int i =0;
-	// Convert the inumber to a MINODE, be sure to put this away
-	MINODE* mip;
-	mip= getParentNode(ip, inum);
-	if (mip == 0) {
+    int i =0;
+
+	if(inum < 2){
+		printf("Encountered unknown inode %d\n", inum);
+		return 0;
+	}
+	// Search the given inodes' i_blocks
+	for (i = 0; i < 12; i++)
+	{
+
+	       	// Convert the i_block[0] to a buff
+	       	get_block(fd, ip->i_block[i], buf);
+	       	printf("the ip->i_block I get is: %d\n", ip->i_block[i]);
+	       	cp = buf;
+	       	// Convert the buff to a DIR
+	       	dp = (DIR*)buf;
+
+	       	while(cp < buf + BLOCK_SIZE){
+
+
+	       	strncpy(temp, dp->name, dp->name_len);
+
+			temp[dp->name_len] = 0;
+			
+
+			printf("Searching in getParentIno name %s\n", temp);
+			printf("Searched inode's rec length is: %d, "
+					"its name_length is: %d\n ", dp->rec_len, dp->name_len );
+
+
+			if (dp->rec_len == 0) { 
+				printf("encountered a record length of 0 for [%s]\n", temp); 
+				return 0;
+			}
+
+			// We have found the parent DIR
+			if (strcmp(temp, "..") == 0 )
+			{
+				int cur_blk = (dp->inode - 1) / 8 + bg_inode_table;
+				int cur_offset = (dp->inode - 1) % 8;
+
+				get_block(fd, cur_blk, buf2);
+				// Convert the inumber to a MINODE, be sure to put this away
+				INODE *pip = (INODE *)buf2 + cur_offset;
+				return pip;
+			}
+			// move to the next DIR entry:
+				cp += (dp->rec_len);   // advance cp by rec_len BYTEs
+				dp = (DIR*)cp;     // pull dp along to the next record
+		}
+	}
+	return 0;
+}
+
+
+
+/**
+ * Takes in an inode pointer and its inum
+ * and returns the corresponding directory
+ */
+DIR * getDir(INODE * ip, int inum){
+	char *cp;  char temp[256];
+    DIR  *dp;
+	int i = 0;
+
+	// Convert the inumber to a INODE
+	INODE* pip = 0;
+	pip = getParentNode(ip, inum);
+	if (pip == 0) {
+		//printf(ANSI_COLOR_RED "Error traversing file system \n" ANSI_COLOR_RESET);
 		printf("Error traversing file system \n");
 		return 0;
 	}
 
-	tempNode = &(mip->INODE);
 
-
-    get_block(fd, tempNode->i_block[i], buf);
+    get_block(fd, pip->i_block[i], buf);
     cp = buf;
     dp = (DIR*)buf;
 
@@ -474,12 +479,11 @@ DIR * getDir(INODE * ip, int inum){
     	strncpy(temp, dp->name, dp->name_len);
     	temp[dp->name_len] = 0;
     	if (dp->rec_len == 0) {
-    		iput(mip);
 			return 0; }
 
     	if(dp->inode == inum ){
 		//printf("Found the return dir: %s\n", dp->name );
-		iput(mip);
+		//iput(mip);
 		return dp;
 		      		}
 		// move to the next DIR entry:
@@ -488,6 +492,8 @@ DIR * getDir(INODE * ip, int inum){
 	}
 
 }
+
+
 
 
 
@@ -507,16 +513,23 @@ MINODE *iget(int dev, int ino)
 	{
 		if (minode[i].dev == dev && minode[i].ino == ino){
 			// If the minode doesn't have a name...
-			if(strcmp(minode[i].name, "") == 0){
-				// If ino isn't root..
+
+			// Obtaining names does not work with files
+			short permission = minode[i].INODE.i_mode >> 12;
+			//printf("Edoardo's magic number: %d Edoardo's magic number as an octal %o\n\n", permission, permission);
+
+			if(strcmp(minode[i].name, "") == 0 && permission == 4 ){
+				printf(" I have entered the if statement! something wen right! \n");
+				printf("Here is the inode's ");
+
 				if(ino > 2) {
 					// Assign a name to the bitch.
 					INODE *ptr = &(minode[i].INODE);
 					DIR * dp  = (DIR*)getDir(ptr, minode[i].ino );
+
 					if(dp != 0){
 						strncpy(temp_name, dp->name, dp->name_len);
 						temp_name[dp->name_len] = 0;
-						printf("The directory namelength is: %d\n", dp->name_len);
 						printf("Adding a mip name %s, \n", temp_name);
 						strcpy(minode[i].name, temp_name);
 						//minode[i].name[dp->name_len] =0;
@@ -553,7 +566,8 @@ MINODE *iget(int dev, int ino)
 
 	// We need the dir to obtain the name!
 	// But let's not find the name of root, that causes errors...
-	if(ino > 2) {
+	short permission = mip->INODE.i_mode >> 12;
+	if(ino > 2 && permission == 4 ) {
 		// Assign a name to this bitch.
 		DIR * dp  = getDir(ip, ino);
 
@@ -589,6 +603,89 @@ MINODE *iget(int dev, int ino)
 
 
 
+
+
+
+
+
+/**
+ *   Takes an inode and its inumber and returns its corresponding
+ *   dir pointer
+ */
+
+DIR *last_entry(int blk, int print)
+{
+	char *cp, sbuf[BLKSIZE];
+	DIR *dp;
+
+	get_block(fd, blk, sbuf);	
+	//sbuf = ip->i_block[i];
+	dp = (DIR *)sbuf;
+	cp = sbuf;
+	DIR *temp;
+	while (cp < sbuf + BLKSIZE){	
+		temp = (DIR*)cp;		  	
+		if (print == 1) printf("inode=%.4d rec_len=%.4d name_len=%.4d name=%s\n", dp->inode, dp->rec_len, dp->name_len, dp->name);
+		if (dp->rec_len == 0) return;	
+		cp += dp->rec_len;
+		dp = (DIR *)cp;
+	}
+	
+	return temp;
+}
+
+int my_getino(int *dev, char *pathname){
+	char buf[1024]; 
+	int istart = bg_inode_table;
+	printf("THIS IS OUR GETINO!\n");
+	MINODE *start = root;
+	if (pathname[0] != '/'){
+		start = (MINODE*)running->cwd;
+	}
+	INODE *current_inode = &root->INODE;
+	int ino;
+	char *piece;
+	int ino_res;
+	while (piece = (char*)parse_pathname(pathname, 0)){
+		ino_res = search(current_inode, piece);
+		if (ino_res == 0){
+			printf("[%s] does not exist\n", piece);
+			return 0;
+		}
+		int blk    = (ino_res - 1) / 8 + istart;
+		int offset = (ino_res - 1) % 8;
+		get_block(fd, blk, buf);
+		current_inode = (INODE *)buf + offset;
+	}
+	return ino_res;
+}
+
+void show_dir(int blk)
+{
+	char *cp, sbuf[BLKSIZE];
+	DIR *dp;
+
+	get_block(fd, blk, sbuf);	
+	dp = (DIR *)sbuf;
+	cp = sbuf;
+	DIR *temp;
+	while (cp < sbuf + BLKSIZE){	
+		temp = (DIR*)cp;		  	
+		printf("inode=%.4d rec_len=%.4d name_len=%.4d name=%s\n", dp->inode, dp->rec_len, dp->name_len, dp->name);
+		if (dp->rec_len == 0) return;	
+		cp += dp->rec_len;
+		dp = (DIR *)cp;
+	}
+}
+
+int contains(char *str, char c){
+	int i = 0;
+	while(str){
+		if (*str == c) return i;
+		str++; i++;
+	}
+	return -1;
+}	
 
 
 

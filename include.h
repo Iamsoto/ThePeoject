@@ -36,6 +36,8 @@ extern MOUNT *mp;
 extern int bmap, imap, inode_start;
 extern int ninodes, nblocks, ifree, bfree;
 
+extern char *entry_name(DIR *folder);
+
 /*
 
 extern int dev;
