@@ -1,5 +1,5 @@
 #include "include.h"
-
+extern char * totalPath();
 
 /**
  * Essentially the makedir function except its designed to update things...
@@ -90,9 +90,13 @@
 int my_link(char *pathname, char *parameter){
 	char buf[1024];
 	char the_buf2[1024]= { 0 };
+	char tempParam[200] = { 0 };
 	int ino = getino(&dev, pathname);
-	int ino_base = getino(&dev, dirname(pathname));
-	if (ino == 0){ return 0; }
+
+	strcpy(tempParam, parameter);
+	int ino_base = getino(&dev, dirname(tempParam));
+
+	if (ino == 0){ return 0;}
 	if(ino_base == 0) {return 0;}
 
 	// The Minode trying to be copied
@@ -100,7 +104,7 @@ int my_link(char *pathname, char *parameter){
 	// The minode of the base
 	MINODE *mip_base = iget(dev,ino_base);
 
-	printf("ino for pathname is %d\n", ino);
+	printf("\n\nThe pathname: %s the parameter: %s \n",pathname, parameter);
 	
 	// Check to make sure file being copied is Dir
 	if ((mip_to_copy->INODE.i_mode & 0xF000) == 0x4000){
@@ -116,12 +120,19 @@ int my_link(char *pathname, char *parameter){
 
 	// Check if file-to-link already exists
 	char path_new_file[200] = { 0 };
-	strcpy(path_new_file, dirname(pathname));
-	strcat(path_new_file, "/");
-	strcat(path_new_file, parameter);
-	printf("The total new path = %s\n", path_new_file);
-	if(getino(path_new_file) != 0){
+	if(parameter[0] == '/'){
+		strcpy(path_new_file, parameter);
+		printf("The total new path = %s\n", path_new_file);
+
+	}else {
+		strcpy(path_new_file, totalPath());
+		strcat(path_new_file, "/");
+		strcat(path_new_file, parameter );
+		printf("The total new path = %s\n", path_new_file);
+	}
+	if(getino(&dev, path_new_file) != 0){
 		printf("File to link already exists \n");
+		return 0;
 	}
 
 	// The base inode
