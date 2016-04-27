@@ -54,7 +54,7 @@ extern int touch(char *pathname);
 extern int my_write();
 extern int laread(int fd,char buf[], int nbytes);
 extern int my_cat(char *pathname);
-extern int link();
+extern int my_link(char *pathname, char *param);
 extern MINODE *getParentNode(INODE * ip, int inum);
 extern MINODE *getParentMinode(INODE * ip, int inum);
 
@@ -409,7 +409,7 @@ int main(int argc, char *argv[ ])
 	init();
 
 	char *function_names[] = {"touch", "chmod", "chown", "chgrp", "ls", "cd", "clear", "open", "mkdir", "creat", "pwd", "rmdir", "write", "cat", "parse", "link", 0};
-	int (*fptr[])() = {touch, my_chmod, chown, chgrp, ls2, cd, clear, laopen_file, mkdir_creat, mkdir_creat, pwd, my_rmdir, my_write, my_cat, parse, link, 0};
+	int (*fptr[])() = {touch, my_chmod, chown, chgrp, ls2, cd, clear, laopen_file, mkdir_creat, mkdir_creat, pwd, my_rmdir, my_write, my_cat, parse, my_link, 0};
 
 	//test_write();
 
