@@ -1,6 +1,6 @@
 echo > mydisk
 mkfs -b 1024 mydisk 1440
-cc -m32 utilities.c main.c getino.o mkdir_creat.c cd_pwd.c open_close_lseek.c misc_level1.c link_stuff.c
+cc -m32 utilities.c main.c getino.o mkdir_creat.c cd_pwd.c open_close_lseek.c misc_level1.c link_stuff.c write-cp-mv.c
 
 sudo mount -o loop mydisk mnt
 

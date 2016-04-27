@@ -54,9 +54,17 @@ extern int touch(char *pathname);
 extern int my_write();
 extern int laread(int fd,char buf[], int nbytes);
 extern int my_cat(char *pathname);
-extern int link();
+extern int my_link();
 extern MINODE *getParentNode(INODE * ip, int inum);
 extern MINODE *getParentMinode(INODE * ip, int inum);
+extern int my_unlink(char *ptn);
+extern int my_cp();
+extern int mv();
+extern int symlink(char *pathname, char *parameter);
+
+int my_close(char *pathname){
+	laclose_file(atoi(pathname));
+}
 
 int put_block(int fd, int blk, char buf[ ])
 {
@@ -218,10 +226,20 @@ int chgrp(char *param){}
 
 int parse(char *param){
 	char *s;
-	while (s = (char*)parse_pathname(param, 0)){
+	param = dirname(param);
+	while (s = (char*)parse_ptn(&param)){
 		printf("[%s]\n", s);
 	}
 }
+
+int dr_name(char *pts){
+	printf("%s\n", dirname(pts));
+}
+
+int bs_name(char *pts){
+	printf("%s\n", basename(pts));
+}
+
 
 int ls_format(char * name, INODE* inode){
 
@@ -235,13 +253,9 @@ int ls_format(char * name, INODE* inode){
 	if ((inode->i_mode & 0xF000) == 0x8000){
 		//printf(ANSI_COLOR_BLUE);
 		printf("%c",'f');
-	}
-
-	if ((inode->i_mode & 0xF000) == 0x4000){
-
+	}else if ((inode->i_mode & 0xF000) == 0x4000){
 		printf("%c",'d');
-	}
-	if ((inode->i_mode & 0xF000) == 0xA000){
+	}else if ((inode->i_mode & 0xF000) == 0xA000){
 		//printf(ANSI_COLOR_RED);
 		printf("%c",'l');
 	}
@@ -262,15 +276,15 @@ int ls_format(char * name, INODE* inode){
 		//printf("%d", cur_bt);	
 		if (cur_bt == 0) putchar('-');
 		else{
-			printf("%d", bts[(i + 1) % 3]);
+			printf("%c", bts[2 - ((i + 3) % 3)]);
 		}
 	}
 
-
-	  printf("%4d ",inode->i_links_count);
-	  printf("%4d ",inode->i_gid);
-	  printf("%4d ",inode->i_uid);
-	  printf("%8d ",inode->i_size);
+	  printf("  ");
+	  printf("%.13d ",inode->i_links_count);
+	  printf("%.5d ",inode->i_gid);
+	  printf("%.5d ",inode->i_uid);
+	  printf("%.6d ",inode->i_size);
 
 
 
@@ -309,7 +323,7 @@ int ls2(char *path){
 	// If search path from root
 	if (path[0] == '/'){
 
-		int ino = getino(&dev, path);
+		int ino = my_getino(&dev, path);
 		mip_to_list = iget(dev,ino);
 	}
 	else { // Obtain path from current directory
@@ -320,16 +334,16 @@ int ls2(char *path){
 			strcat(full_path, "/");
 			strcat(full_path, path);
 		}
-		int ino = getino(&dev, full_path);
+		int ino = my_getino(&dev, full_path);
 		mip_to_list = iget(dev,ino);
 	}
 
-
+	printf("\npermissions i_links_count i_gid i_uid i_size\n");
 	int i =0;
 	for(i=0; i< 12; i++){ // Search i_blocks of mip_To_list
 
 		if(mip_to_list->INODE.i_block[i] == 0){
-			printf("End ls\n");
+			printf("\nEnd ls\n");
 			return 0;
 		}
 
@@ -408,8 +422,8 @@ int main(int argc, char *argv[ ])
 
 	init();
 
-	char *function_names[] = {"touch", "chmod", "chown", "chgrp", "ls", "cd", "clear", "open", "mkdir", "creat", "pwd", "rmdir", "write", "cat", "parse", "link", 0};
-	int (*fptr[])() = {touch, my_chmod, chown, chgrp, ls2, cd, clear, laopen_file, mkdir_creat, mkdir_creat, pwd, my_rmdir, my_write, my_cat, parse, link, 0};
+	char *function_names[] = {"touch", "chmod", "chown", "chgrp", "ls", "cd", "clear", "open", "mkdir", "creat", "pwd", "rmdir", "write", "cat", "parse", "link", "dr_name", "bs_name", "unlink", "cp", "close", "move", "symlink", 0};
+	int (*fptr[])() = {touch, my_chmod, chown, chgrp, ls2, cd, clear, laopen_file, mkdir_creat, mkdir_creat, pwd, my_rmdir, my_write, my_cat, parse, my_link, dr_name, bs_name, my_unlink, my_cp, my_close, mv, symlink, 0};
 
 	//test_write();
 

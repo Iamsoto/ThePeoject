@@ -42,7 +42,7 @@ int mkdir_creat(char *pathname){
 	
 	printf("parent = %s child = %s\n", parent, child);
 
-	int pino = getino(&dev, parent); //3. Get the In_MEMORY minode of parent:
+	int pino = my_getino(&dev, parent); //3. Get the In_MEMORY minode of parent:
 	MINODE *pip = iget(dev, pino);
 
 	if (S_ISREG(pip->INODE.i_mode)){ printf("pip is not a dir!\n"); return; } //Verify : (1). parent INODE is a DIR (HOW?)
@@ -62,6 +62,7 @@ int mkdir_creat(char *pathname){
 
 
 int mymkdir(MINODE *pip, char *name, int pino, int dir){
+	int is_link = (stcmp(command_name, "symlink") == 0);
 	//2. allocate an inode and a disk block for the new directory;
 	int ino = ialloc(dev);    
 	int bno = balloc(dev);
@@ -84,6 +85,7 @@ int mymkdir(MINODE *pip, char *name, int pino, int dir){
 	//drwxr-xr-x
 	ip->i_mode 	  = 0x41ED; 
 	if (dir == 0) { ip->i_mode = 0x81A4; }
+	if (is_link == 1) { ip->i_mode = 0xA000; }
 	printf("i_mode set to %x\n", ip->i_mode);
 	ip->i_uid    	  = running->uid;
 	ip->i_gid  	  = running->gid;
@@ -215,13 +217,23 @@ int enter_name(MINODE *pip, int myino, char *myname){
 }
 
 int my_rmdir(char *pathname){
+	char backup_pathname[256];
+	strcpy(backup_pathname, pathname);
 	if(strcmp(pathname, ".") == 0 || strcmp(pathname, "..") == 0){
 		printf("You cannot delete this folder KC, nice try!\n");
 		return 0;
 	}
 	 
 	getchar();
-	int ino = getino(&dev, pathname); //2. get inumber of pathname: determine dev, then  
+	char ptn_copy[256];
+	strcpy(ptn_copy, pathname);
+	printf("ptn_copy = %s\n", ptn_copy);
+	int ino  = my_getino(&dev, pathname); //2. get inumber of pathname: determine dev, then
+	if (ino == 0){
+		printf("%s does not exist\n", pathname);
+		return;
+	}
+	printf("got ino %d for pathname %s in my_rmdir()\n", ino, pathname);
 	MINODE *mip = iget(dev, ino); //3. get its minode[ ] pointer:
 	/*	  
 	4. check ownership 
@@ -282,10 +294,19 @@ int my_rmdir(char *pathname){
 	//	7. get parent DIR's ino and Minode (pointed by pip);
 	//search(INODE * inodePtr, char * directory_name)
 	getchar();
-	int pino = root->ino;//search(&mip->INODE, "..");
+	char *parent = dirname(backup_pathname);
+	
+	printf("parent in remove dir is %s\n", parent);
+	int pino = getino(&dev, parent);
         MINODE *pip = iget(mip->dev, pino); 
 
-	rm_child(pip, pathname);
+	printf("getting basename of %s\n", ptn_copy);
+
+	char *child = basename(ptn_copy);
+	
+	printf("child in remove_dir is %s\n", child); 
+	
+	rm_child(pip, child);
 
 	printf("got to line 265\n");
 
@@ -297,7 +318,8 @@ int my_rmdir(char *pathname){
 }
 
 int rm_child(MINODE *parent, char *name){
-	
+
+	printf("parent name is %s\n", parent->name);	
 	printf("name in rm_child is %s\n", name);
 
 	char buf[1024];	
@@ -330,7 +352,8 @@ int rm_child(MINODE *parent, char *name){
 	      		temp[dp->name_len] = 0;
 			if (strcmp(name, temp) == 0)
 			{
-				printf("Found %s\n", temp); found = 1;	
+				printf("Found %s\n", temp); 
+				found = 1;	
 				break;			
 			}else if (dp->rec_len == 0) { break; }
 			previous = dp;
@@ -341,6 +364,11 @@ int rm_child(MINODE *parent, char *name){
 	}
 
 	//last, middle, first
+	
+	if (dp->rec_len == 0){
+		printf("could not find %s\n", name);
+		return;
+	}
 	
 	if (stepped > 1 && cp + (dp->rec_len) < buf + BLKSIZE){
 		show_dir(blk);
@@ -364,10 +392,12 @@ int rm_child(MINODE *parent, char *name){
 
 		printf("finding the last one\n");
 		last = next;
-		char *cq = (char*)last;
-		while(cq < buf + BLKSIZE){
-			last = (DIR*)cq;
-			cq += last->rec_len;
+
+		while(cp < buf + BLKSIZE){
+			last = (DIR*)cp;
+			cp += last->rec_len;
+			DIR *the_next = (DIR*)cp;
+			if (the_next->rec_len == 0) break;
 		}
 
 		//print the name of the last entry

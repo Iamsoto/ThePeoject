@@ -171,7 +171,7 @@ int laopen_file(char *pathname, char* str_mode ){
 	     // last user of this OFT entry ==> dispose of the Minode[]
 	     MINODE * mip = oftp->inodeptr;
 	     iput(mip);
-	     oftp = 0;
+	     running->fd[fd] = 0;
 
 
 
@@ -198,6 +198,7 @@ int laopen_file(char *pathname, char* str_mode ){
 	 // If this file is opened for write, please return yourself.
 	 if(oft[fd].mode == 1 ){
 		 printf("This file is open for write\n");
+		 return 0;
 	 }
 
 	 //printf("This is my read\n" );
@@ -351,17 +352,9 @@ int my_write(){
 	int dest_fd; 
 	char read_line[256];
 	
-	printf("enter a file descriptor:\n");
+	dest_fd = atoi(pathname);
 	
-	fgets(read_line, 256, stdin);
-	read_line[strlen(read_line) - 1] = 0;
-	
-	dest_fd = atoi(read_line);
-	
-	printf("enter a string to write\n");
-	
-	fgets(read_line, 256, stdin);
-	read_line[strlen(read_line) - 1] = 0;
+	strcpy(read_line, parameter);
 
 	//TODO 2. verify fd is indeed opened for WR or RW or APPEND mode
 	
@@ -384,15 +377,25 @@ int my_write(){
 	
 	printf("Preparing to write %s with length %d to fd %d\n", read_line, strlen(read_line), dest_fd);
 	
+	
+	
 	return mywrite(dest_fd, read_line, strlen(read_line));
 }
 
 int mywrite(int dest_fd, char buf[], int nbytes){
 
+	OFT *file_pointer = running->fd[dest_fd];
+
 	char wbuf[1024];
 	OFT *oftp   = running->fd[dest_fd];
 	MINODE *mip = oftp->inodeptr;
 	INODE *ip   = &mip->INODE;
+	
+	int new_size = nbytes;
+	
+	if (file_pointer->mode == 3){
+		new_size += ip->i_size;
+	}
 	
 	if (oftp == 0){
 		printf("oftp is null\n"); return;
@@ -431,7 +434,7 @@ int mywrite(int dest_fd, char buf[], int nbytes){
 			printf("writing to indirect block\n");
 			unsigned int *first_ptr = &mip->INODE.i_block[13];
 			unsigned int in_start[256][256];
-			memcpy(in_start, &first_ptr, sizeof(int)*256*256);
+			memcpy(in_start, &first_ptr, sizeof(int)*256);
 			int first_index = lbk / 256;
 			if (in_start[first_index][lbk] == 0){
 				in_start[first_index][lbk] = balloc(mip->dev);
@@ -443,6 +446,7 @@ int mywrite(int dest_fd, char buf[], int nbytes){
 			printf("writing to double indirect block\n");
 		}
 		/* all cases come to here : write to the data block */
+		printf("Writing to dev %d at block %d\n", mip->dev, blk);
 		get_block(mip->dev, blk, wbuf);
 		char *cp      = wbuf + start_byte;
 		char *cq      = buf;
@@ -470,13 +474,21 @@ int mywrite(int dest_fd, char buf[], int nbytes){
 				if (nbytes <= 0) break;
 			}
 		}
-				
+		printf("new file size is %d\n", new_size);
+		mip->INODE.i_size = new_size;
+		ip->i_size = new_size;
+
 		put_block(mip->dev, blk, wbuf);
 	}
-	mip->dirty = 1;
+
+	mip->dirty = 1;	
+	iput(mip);
+	return nbytes;
 }
 
-
+int my_lseek(int fd, int position){
+	OFT *file_pointer = running->fd[fd];
+}
 
 
 

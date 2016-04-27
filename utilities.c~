@@ -1,8 +1,5 @@
 #include "include.h"
 
-extern int bdealloc(int dev, int bno);
-extern int idealloc(int dev, int ino);
-
 int iput(MINODE *mip)
 {
 	printf("entering iput\n");
@@ -258,10 +255,10 @@ int findino(MINODE *mip, int *myino, int *parentino)
 	*/	
 }
 
-int search(INODE * inodePtr, char * directory_name)
+int search(INODE * inodePtr, char * directory_name, int print)
 {
 	//get the data block of inodePtr
-	printf("===================================\n");
+	printf("search()\n");
 	int k, i;
 	char *cp;  char temp[256];
        	DIR  *dp;
@@ -269,23 +266,25 @@ int search(INODE * inodePtr, char * directory_name)
        	// ASSUME INODE *ip -> INODE
 	for (i = 0; i < 12; i++)
 	{
-
-	       	//printf("i_block[%d] = %d\n", i, inodePtr->i_block[i]); // print blk number
+		if (inodePtr->i_block[i] == 0){
+			return 0;
+		}
+	       	printf("i_block[%d] = %d\n", i, inodePtr->i_block[i]); // print blk number
 	       	get_block(fd, inodePtr->i_block[i], buf);     // read INODE's i_block[0]
 	       	cp = buf;  
 	       	dp = (DIR*)buf;
 	       	while(cp < buf + BLKSIZE){
-			printf("Searching for %s\n", directory_name);
 			//getchar();	      		
 			strncpy(temp, dp->name, dp->name_len);
 	      		temp[dp->name_len] = 0;
-	      		//printf("%.4d  %.4d  %.4d  [%s]\n", dp->inode, dp->rec_len, dp->name_len, temp);
+	      		printf("%.4d  %.4d  %.4d  [%s]\n", dp->inode, dp->rec_len, dp->name_len, temp);
 			//printf("comparing [%s] and [%s]\n", temp, directory_name);
 			if (strcmp(directory_name, temp) == 0)
 			{
 				//printf("Found %s\n", directory_name);
-
+				printf("search()\n");
 				return dp->inode;
+				
 			}else if (dp->rec_len == 0) { break; }
 	      		//getchar();			
 	      		// move to the next DIR entry:
@@ -294,6 +293,7 @@ int search(INODE * inodePtr, char * directory_name)
 	       	}
 	}
 
+	printf("search()\n");
 	return 0;
 }
 
@@ -634,30 +634,140 @@ DIR *last_entry(int blk, int print)
 	return temp;
 }
 
+char *parse_ptn(char **ptn){
+
+	if (strlen(*ptn) == 0){
+		return 0;
+	}
+
+	char cpy[1024];
+	strcpy(cpy, *ptn);
+
+	printf("parse_ptn(): parsing %s\n", *ptn);
+
+	char * s = strtok(cpy, "/");
+	if (!s) return 0;
+	int len = strlen(s);
+	
+	printf("parse_ptn(): parsing %s\n", *ptn);
+	
+	*ptn += 1 + len;
+	
+	printf("parse_ptn(): changed ptn to %s\n", *ptn);
+
+	return s;
+}
+
+char *parse_pathname(char *pathname, int reset){
+	static int location = 0;
+	if (pathname[location] == '/'){
+		location++;
+	}
+	if (reset == 1){
+		printf("parse_pathname(): returning null because of reset\n");
+		location = 0; return 0;
+	}
+	if (location >= strlen(pathname)) { 
+		location = 0; printf("parse_pathname(): returning null, exceeded length\n");
+		return 0; 
+	}
+
+	int i = location;
+	char found = 0;
+
+	char piece[256];
+
+	while (pathname[i]){
+		if (pathname[i] == '/'){
+			i++; //increment i to make it point after the end
+			found = 1;
+			break;
+		}
+		else{
+			piece[i - location] = pathname[i]; //copy 1 byte
+		}
+		i++;
+	}
+	
+	if (!(pathname[i])) i++;
+	piece[i - location - 1] = 0;
+	location = i;
+	char *piece_pointer = piece;
+	printf("parse_pathname(): returning piece [%s]\n", piece);
+	return piece_pointer;
+}
+
 int my_getino(int *dev, char *pathname){
+	
+	printf("===========================================\n");
+	
 	char buf[1024]; 
-	int istart = bg_inode_table;
-	printf("THIS IS OUR GETINO!\n");
+	printf("THIS IS OUR GETINO!: ");
+	
 	MINODE *start = root;
 	if (pathname[0] != '/'){
 		start = (MINODE*)running->cwd;
 	}
+	
+	printf("search for %s in MINODE [%d, %d]\n", pathname, *dev, start->ino); 
+	
 	INODE *current_inode = &root->INODE;
+	
+	char path_copy[256];
+	strcpy(path_copy, pathname);
+	
+	printf("path copy is %s\n", path_copy);
+	
+	//take the directory name and child
+	
+	char *parent = dirname(pathname);
+	
+	printf("parent in my_getino(): %s\n", parent);
+	
+	printf("parent is %s\n", parent);
+	
+	//search for child in parent
+	
 	int ino;
-	char *piece;
-	int ino_res;
-	while (piece = (char*)parse_pathname(pathname, 0)){
-		ino_res = search(current_inode, piece);
-		if (ino_res == 0){
-			printf("[%s] does not exist\n", piece);
+	
+	char *s = strtok(path_copy, "/");	
+	if (s == 0) s = ".";
+	
+	while (s){
+		if (strcmp(s, "__getcwd") == 0) break;
+		//search to see if s is in the current inode
+		printf("Passing %s into search from my_getino() loop\n", s);
+		ino = search(current_inode, s, 1);
+		if (ino == 0){
+			printf("getino(): %s does not exist\n", s);
+			printf("===========================================\n");
 			return 0;
 		}
-		int blk    = (ino_res - 1) / 8 + istart;
-		int offset = (ino_res - 1) % 8;
-		get_block(fd, blk, buf);
-		current_inode = (INODE *)buf + offset;
+		int blk    = (ino - 1) / 8 + bg_inode_table;
+		int offset = (ino - 1) % 8; 
+		get_block(*dev, blk, buf);
+		current_inode = (INODE*)buf + offset; 
+		s = strtok(0, "/");
 	}
-	return ino_res;
+	
+	int child_ino    = ino;//search(current_inode, child, 1);
+	
+	if (child_ino == 0){
+		printf("getino(): %s does not exist\n", pathaname);
+		printf("===========================================\n");
+		return 0;
+	}
+	
+	int child_blk    = (child_ino - 1) / 8 + bg_inode_table;
+	int child_offset = (child_ino - 1) % 8;
+	
+	MINODE *child_res = (MINODE*)iget(fd, child_ino);
+	
+	*dev = child_res->dev;
+		
+	printf("===========================================\n");
+
+	return child_res->ino;
 }
 
 void show_dir(int blk)
