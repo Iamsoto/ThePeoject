@@ -8,7 +8,7 @@ char *t2 = "----------------";
 extern int cd(char *param);
 extern int pwd(char *param);
 extern char * totalPath();
-
+extern int pfd();
 char *command_name;
 
 char the_buf2[1024] = { 0 };
@@ -429,8 +429,8 @@ int main(int argc, char *argv[ ])
 
 	init();
 
-	char *function_names[] = {"touch", "chmod", "chown", "chgrp", "ls", "cd", "clear", "open", "mkdir", "creat", "pwd", "rmdir", "write", "cat", "parse", "link", "dr_name", "bs_name", "unlink", "cp", "close", "move", "symlink", "rm", "quit", 0};
-	int (*fptr[])() = {touch, my_chmod, chown, my_chgrp, ls2, cd, clear, laopen_file, mkdir_creat, mkdir_creat, pwd, my_rmdir, my_write, my_cat, parse, my_link, dr_name, bs_name, my_unlink, my_cp, my_close, mv, symlink, my_rm, quit, 0};
+	char *function_names[] = {"touch", "chmod", "chown", "chgrp", "ls", "cd", "clear", "open", "mkdir", "creat", "pwd", "rmdir", "write", "cat", "parse", "link", "dr_name", "bs_name", "unlink", "cp", "close", "move", "symlink", "rm", "quit", "pfd", 0};
+	int (*fptr[])() = {touch, my_chmod, chown, my_chgrp, ls2, cd, clear, laopen_file, mkdir_creat, mkdir_creat, pwd, my_rmdir, my_write, my_cat, parse, my_link, dr_name, bs_name, my_unlink, my_cp, my_close, mv, symlink, my_rm, quit, pfd, 0};
 
 	//test_write();
 

@@ -144,7 +144,7 @@ int laopen_file(char *pathname, char* str_mode ){
 /**
  * Confusion between processe's fd[] and the global array oft[]
  */
-	int laclose_file(int fd)
+	int laclose_file(char* fd)
 	{
 	  printf("Entering Close_file\n");
 	  if(fd >= NOFT){
@@ -453,13 +453,24 @@ int mywrite(int dest_fd, char buf[], int nbytes){
 		int remain    = BLKSIZE - start_byte;
 		int kc_method = 1;
 		
+		char the_buf[1024];
+		INODE * write_back = 0;
+
+		int cur_blk    = (mip->ino - 1) / 8 + bg_inode_table;
+		int cur_offset = (mip->ino - 1) % 8;
+		get_block(mip->dev, cur_blk, the_buf);
+		write_back = (INODE *)the_buf + cur_offset;
+
+
 		if (kc_method){	
 			while (remain > 0){
 				*cp++ = *cq++;
 				nbytes--; remain--;
 				oftp->offset++;
-				if (oftp->offset > mip->INODE.i_size)
+				if (oftp->offset > mip->INODE.i_size){
+					write_back->i_size++;
 					mip->INODE.i_size++;
+				}
 				if (nbytes <= 0) break;
 			}
 		}
@@ -469,8 +480,9 @@ int mywrite(int dest_fd, char buf[], int nbytes){
 				memcpy(cp, cq, copied);
 				nbytes -= copied; remain -= copied;
 				oftp->offset += copied;
-				if (oftp->offset > mip->INODE.i_size)
+				if (oftp->offset > mip->INODE.i_size){
 					mip->INODE.i_size++;
+				}
 				if (nbytes <= 0) break;
 			}
 		}
@@ -479,6 +491,7 @@ int mywrite(int dest_fd, char buf[], int nbytes){
 		ip->i_size = new_size;
 
 		put_block(mip->dev, blk, wbuf);
+		put_block(mip->dev, cur_blk, the_buf);
 	}
 
 	mip->dirty = 1;	
@@ -486,12 +499,39 @@ int mywrite(int dest_fd, char buf[], int nbytes){
 	return nbytes;
 }
 
+/*
+ * The lseek function
+ */
 int my_lseek(int fd, int position){
 	OFT *file_pointer = running->fd[fd];
+	//if(position <= )
 }
 
 
-
+/**
+ * print all the open files
+ */
+int pfd(){
+	printf("* * * * *pfd:* * * * ");
+	printf("Open files: \n");
+	int i =0;
+	for(i =0; i<10; i++){
+		OFT * fd = running->fd[i];
+		if(fd->refCount >1){
+			printf("\nOpen file fd: %d\n", i);
+			char the_mode[10] = { 0 };
+			if(fd->mode == 0){
+				strcpy(the_mode, "READ");
+			}
+			else {
+				strcpy(the_mode,"WRITE");
+			}
+			printf("Open file mode: %s \n ", the_mode);
+			printf("Open file inode: %d\n", fd->inodeptr->ino);
+		}
+	}
+	return 0;
+}
 
 
 
