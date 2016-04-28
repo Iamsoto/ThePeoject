@@ -31,8 +31,11 @@ int chown(){
 		else{
 			printf("Found %s with inode number %d\n", piece, ino);
 		}
+
 		blk = (ino - 1) / 8 + bg_inode_table;
 		int offset = (ino - 1) % 8;
+
+
 		//get the next inode
 		get_block(fd, blk, buf);
 		current = (INODE *)buf + offset;
@@ -147,7 +150,33 @@ int my_chmod(){
 	put_block(fd, blk, buf);
 }
 
+/**
+ * chgrp bob
+ * chgrp ../goo
+ * chgrp /bob/pizza
+ *
+ */
+int my_chgrp(char * pathname, char * str_group_id){
 
+	int group_id = atoi(str_group_id);
+
+	// Obtain the correct inode...
+	int ino = getino(&dev, pathname);
+	MINODE * mip = iget(dev, ino);
+	char the_buf[1028] = { 0 };
+
+	int blk = (ino - 1) / 8 + bg_inode_table;
+	int offset = (ino - 1) % 8;
+
+	get_block(fd, blk, the_buf);
+	INODE * current = (INODE *)the_buf + offset;
+	current->i_gid = group_id;
+	put_block(fd, blk, the_buf);
+	iput(mip);
+
+	//short mode = current->i_mode;
+	return 0;
+}
 
 
 

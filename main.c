@@ -44,6 +44,7 @@ MOUNT *mp;
 int bmap, imap, inode_start;
 int ninodes, nblocks, ifree, bfree;
 
+extern int my_chgrp(char * pathname, char * group_id);
 extern int mkdir_creat(char *pathname);
 extern int laopen_file(char *pathname, char* str_mode );
 extern int laclose_file(int fd);
@@ -408,8 +409,8 @@ int main(int argc, char *argv[ ])
 
 	init();
 
-	char *function_names[] = {"touch", "chmod", "chown", "chgrp", "ls", "cd", "clear", "open", "mkdir", "creat", "pwd", "rmdir", "write", "cat", "parse", "link", 0};
-	int (*fptr[])() = {touch, my_chmod, chown, chgrp, ls2, cd, clear, laopen_file, mkdir_creat, mkdir_creat, pwd, my_rmdir, my_write, my_cat, parse, my_link, 0};
+	char *function_names[] = {"chgrp","touch", "chmod", "chown", "chgrp", "ls", "cd", "clear", "open", "mkdir", "creat", "pwd", "rmdir", "write", "cat", "parse", "link", 0};
+	int (*fptr[])() = {my_chgrp, touch, my_chmod, chown, chgrp, ls2, cd, clear, laopen_file, mkdir_creat, mkdir_creat, pwd, my_rmdir, my_write, my_cat, parse, my_link, 0};
 
 	//test_write();
 
