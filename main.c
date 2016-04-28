@@ -61,6 +61,7 @@ extern int my_unlink(char *ptn);
 extern int my_cp();
 extern int mv();
 extern int symlink(char *pathname, char *parameter);
+extern int my_chgrp(char * pathname, char * str_group_id);
 
 int my_close(char *pathname){
 	laclose_file(atoi(pathname));
@@ -221,8 +222,6 @@ int search_array(char *function_names[], char *s)
 	}
 	return -1;
 }
-
-int chgrp(char *param){}
 
 int parse(char *param){
 	char *s;
@@ -413,7 +412,7 @@ int main(int argc, char *argv[ ])
 	init();
 
 	char *function_names[] = {"touch", "chmod", "chown", "chgrp", "ls", "cd", "clear", "open", "mkdir", "creat", "pwd", "rmdir", "write", "cat", "parse", "link", "dr_name", "bs_name", "unlink", "cp", "close", "move", "symlink", 0};
-	int (*fptr[])() = {touch, my_chmod, chown, chgrp, ls2, cd, clear, laopen_file, mkdir_creat, mkdir_creat, pwd, my_rmdir, my_write, my_cat, parse, my_link, dr_name, bs_name, my_unlink, my_cp, my_close, mv, symlink, 0};
+	int (*fptr[])() = {touch, my_chmod, chown, my_chgrp, ls2, cd, clear, laopen_file, mkdir_creat, mkdir_creat, pwd, my_rmdir, my_write, my_cat, parse, my_link, dr_name, bs_name, my_unlink, my_cp, my_close, mv, symlink, 0};
 
 	//test_write();
 

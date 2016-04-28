@@ -61,6 +61,7 @@ extern int my_unlink(char *ptn);
 extern int my_cp();
 extern int mv();
 extern int symlink(char *pathname, char *parameter);
+extern int my_chgrp(char * pathname, char * str_group_id);
 
 int my_close(char *pathname){
 	laclose_file(atoi(pathname));
@@ -222,8 +223,6 @@ int search_array(char *function_names[], char *s)
 	return -1;
 }
 
-int chgrp(char *param){}
-
 int parse(char *param){
 	char *s;
 	param = dirname(param);
@@ -285,7 +284,7 @@ int ls_format(char * name, INODE* inode){
 	  char *access_time = ctime(&i_atime);
 	  char fin_atime[256];
 	  strcpy(fin_atime, access_time);
-	  fin_atime[strlen(fin_atime)-2] = 0;
+	  fin_atime[strlen(fin_atime)-1] = 0;
 	  
 	  printf("%s %s\n", fin_atime, name); 
 }
