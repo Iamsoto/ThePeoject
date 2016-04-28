@@ -221,6 +221,24 @@ int laopen_file(char *pathname, char* str_mode ){
   * TODO:
   * 	Recall that offset does not work because L_seek and truncate do not really work
   */
+  
+int indirect_block(MINODE *mip, int lbk)
+{
+	char temp_buf[1024]; //so that we don't change buf
+	get_block(mip->dev, mip->INODE.i_block[12], temp_buf); //load the indirect blocks into 
+	//temp buf
+	int blk = temp_buf[lbk - 12]; //since we start at the indirect blocks
+	//we must take into account the 12 blocks that came before it
+	return blk;
+}
+
+int db_indirect_block(MINODE *mip, int lbk){
+	char temp_buf[1024];
+	get_block(mip->dev, mip->INODE.i_block[13], temp_buf);
+	int blk;
+	return blk;
+}
+  
 int myread(int fd, char buf[], int nbytes){
     // What is file size??
 
@@ -253,6 +271,9 @@ int myread(int fd, char buf[], int nbytes){
              }
              else if (lbk >= 12 && lbk < 256 + 12) {
                    //  TODO: indirect blocks
+                   printf("hit indirect blocks\n");
+                   getchar();
+                   blk = indirect_block(mip, lbk);
              }
              else{
                    //  TODO: double indirect blocks
