@@ -279,19 +279,15 @@ int ls_format(char * name, INODE* inode){
 	  printf("%.5d ",inode->i_gid);
 	  printf("%.5d ",inode->i_uid);
 	  printf("%.6d ",inode->i_size);
-
-
-
-/*	  // print time - not working
-	  strcpy(ftime, inode->i_ctime);
-	  ftime[strlen(ftime)-1] = 0;
-	  printf("%s  ",ftime);
-	  return 0;*/
-	  // print name
-	  printf("%s", name);
-
-
-	  printf("\n");
+	  
+	  time_t i_atime = inode->i_atime;
+	  
+	  char *access_time = ctime(&i_atime);
+	  char fin_atime[256];
+	  strcpy(fin_atime, access_time);
+	  fin_atime[strlen(fin_atime)-1] = 0;
+	  
+	  printf("%s %s\n", fin_atime, name); 
 }
 
 

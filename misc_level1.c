@@ -15,7 +15,6 @@ char nthBit(int value, int bit){
 }
 
 int chown(){
-
 	char buf[1024];
 	printf("pathname = %s parameter = %s\n", pathname, parameter);
 	int uid = atoi(pathname);
@@ -72,16 +71,18 @@ int my_stat(char *pathname, struct stat *st){
 int touch(char *pathname){
 	char buf[1024];
 	//are we relative to the root or relative to cwd?
-	INODE *current;
 	
 	int dev;
-	int ino    = getino(&dev, parameter);
+	printf("pathname = %s\n", pathname);
+	int ino    = my_getino(&dev, pathname);
 	int blk    = (ino - 1) / 8 + bg_inode_table;
 	int offset = (ino - 1) % 8;
 	
 	get_block(dev, blk, buf);
 	
-	current->i_atime = current->i_ctime = time(0L);
+	INODE *current = (INODE*)buf + offset;
+	
+	current->i_atime = current->i_mtime = time(0L);
 	
 	put_block(dev, blk, buf);
 }
@@ -117,6 +118,27 @@ int my_chmod(){
 	put_block(fd, blk, buf);
 }
 
+int my_chgrp(char * pathname, char * str_group_id){
+
+	int group_id = atoi(str_group_id);
+
+	// Obtain the correct inode...
+	int ino = getino(&dev, pathname);
+	MINODE * mip = iget(dev, ino);
+	char the_buf[1028] = { 0 };
+
+	int blk = (ino - 1) / 8 + bg_inode_table;
+	int offset = (ino - 1) % 8;
+
+	get_block(fd, blk, the_buf);
+	INODE * current = (INODE *)the_buf + offset;
+	current->i_gid = group_id;
+	put_block(fd, blk, the_buf);
+	iput(mip);
+
+	//short mode = current->i_mode;
+	return 0;
+}
 
 
 

@@ -62,7 +62,7 @@ int mkdir_creat(char *pathname){
 
 
 int mymkdir(MINODE *pip, char *name, int pino, int dir){
-	int is_link = (stcmp(command_name, "symlink") == 0);
+	int is_link = (strcmp(command_name, "symlink") == 0);
 	//2. allocate an inode and a disk block for the new directory;
 	int ino = ialloc(dev);    
 	int bno = balloc(dev);
@@ -297,7 +297,7 @@ int my_rmdir(char *pathname){
 	char *parent = dirname(backup_pathname);
 	
 	printf("parent in remove dir is %s\n", parent);
-	int pino = getino(&dev, parent);
+	int pino = my_getino(&dev, parent);
         MINODE *pip = iget(mip->dev, pino); 
 
 	printf("getting basename of %s\n", ptn_copy);
