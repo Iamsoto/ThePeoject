@@ -43,7 +43,7 @@ int laopen_file(char *pathname, char* str_mode ){
 		printf("open_file obtained the dev: %d\n", dev);
 	}
 
-	int ino = getino(&dev, pathname);
+	int ino = my_getino(&dev, pathname);
 	MINODE *mip = iget(dev,ino);
 	printf("Obtained inode of inum:%d\n", mip->ino);
 
@@ -439,7 +439,7 @@ int mywrite(int dest_fd, char buf[], int nbytes){
 			if (in_start[first_index][lbk] == 0){
 				in_start[first_index][lbk] = balloc(mip->dev);
 			}
-			blk = mip->INODE.i_block[lbk];
+			blk = in_start[first_index][lbk];
 		}
 		else{
 			//double indirect blocks

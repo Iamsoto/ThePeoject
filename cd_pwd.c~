@@ -20,7 +20,7 @@ char * totalPath(){
 	if(strcmp(mip->name, "")==0){
 		if(mip->ino> 2){
 			// Assign a name to the bitch.
-			DIR * dp  = getDir(&(mip->INODE), mip->ino );
+			DIR * dp  = (DIR*)getDir(&(mip->INODE), mip->ino );
 			if(dp != 0){
 			strcpy(name0, dp->name);
 			}

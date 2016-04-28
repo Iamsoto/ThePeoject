@@ -123,7 +123,7 @@ int my_chgrp(char * pathname, char * str_group_id){
 	int group_id = atoi(str_group_id);
 
 	// Obtain the correct inode...
-	int ino = getino(&dev, pathname);
+	int ino = my_getino(&dev, pathname);
 	MINODE * mip = iget(dev, ino);
 	char the_buf[1028] = { 0 };
 

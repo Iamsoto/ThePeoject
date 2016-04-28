@@ -77,9 +77,9 @@ int mv(){
 	strcpy(param, parameter);
 	
 	int dev;
-	int src_ino  = getino(&dev,  pathname);
+	int src_ino  = my_getino(&dev,  pathname);
 	int dev2;
-	int dest_ino = getino(&dev2, parameter);
+	int dest_ino = my_getino(&dev2, parameter);
 	
 	if (src_ino == 0){
 		printf("%s does not exists, cancelling\n", pathname);

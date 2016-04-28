@@ -711,7 +711,7 @@ int my_getino(int *dev, char *pathname){
 	
 	printf("search for %s in MINODE [%d, %d]\n", pathname, *dev, start->ino); 
 	
-	INODE *current_inode = &root->INODE;
+	INODE *current_inode = &start->INODE;
 	
 	char path_copy[256];
 	strcpy(path_copy, pathname);

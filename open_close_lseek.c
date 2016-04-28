@@ -43,7 +43,7 @@ int laopen_file(char *pathname, char* str_mode ){
 		printf("open_file obtained the dev: %d\n", dev);
 	}
 
-	int ino = getino(&dev, pathname);
+	int ino = my_getino(&dev, pathname);
 	MINODE *mip = iget(dev,ino);
 	printf("Obtained inode of inum:%d\n", mip->ino);
 

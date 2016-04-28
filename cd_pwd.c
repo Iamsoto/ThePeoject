@@ -89,7 +89,7 @@ int pwd(char *param){
 }
 
 int cd(char *param){
-	int inum = getino(&dev, param);
+	int inum = my_getino(&dev, param);
 	printf("The inum we've received is as follows:%d \n", inum);
 	if(inum <2){
 		printf("I do not believe that directory Exists. I'm sorry KC I can't let you do that \n");

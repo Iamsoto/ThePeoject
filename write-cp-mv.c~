@@ -77,9 +77,9 @@ int mv(){
 	strcpy(param, parameter);
 	
 	int dev;
-	int src_ino  = getino(&dev,  pathname);
+	int src_ino  = my_getino(&dev,  pathname);
 	int dev2;
-	int dest_ino = getino(&dev2, parameter);
+	int dest_ino = my_getino(&dev2, parameter);
 	
 	if (src_ino == 0){
 		printf("%s does not exists, cancelling\n", pathname);
@@ -89,10 +89,10 @@ int mv(){
 	if (dev == dev2){
 		//pathname = (char*)param;
 		printf("same dev\n");
-		printf("ptn = %s pathname = %s\n", param);
+		printf("ptn = %s pathname = %s\n", ptn, param);
 		getchar();
 		my_link(ptn, param);
-		printf("ptn = %s pathname = %s\n", param);
+		printf("ptn = %s pathname = %s\n", ptn, param);
 		getchar();
 		my_unlink(pathname);
 	}else{ //umount and mount not implemented, unlikely to be used

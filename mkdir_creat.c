@@ -217,38 +217,12 @@ int enter_name(MINODE *pip, int myino, char *myname){
 }
 
 int my_rmdir(char *pathname){
-	char backup_pathname[256];
-	strcpy(backup_pathname, pathname);
-	if(strcmp(pathname, ".") == 0 || strcmp(pathname, "..") == 0){
-		printf("You cannot delete this folder KC, nice try!\n");
-		return 0;
-	}
-	 
-	getchar();
-	char ptn_copy[256];
-	strcpy(ptn_copy, pathname);
-	printf("ptn_copy = %s\n", ptn_copy);
-	int ino  = my_getino(&dev, pathname); //2. get inumber of pathname: determine dev, then
-	if (ino == 0){
-		printf("%s does not exist\n", pathname);
-		return;
-	}
-	printf("got ino %d for pathname %s in my_rmdir()\n", ino, pathname);
-	MINODE *mip = iget(dev, ino); //3. get its minode[ ] pointer:
-	/*	  
-	4. check ownership 
-       		super user : OK
-       		not super user: uid must match
-	*/
-	int super_user = 1; //TODO check this later
-	int same_uids = 1; //TODO check this later
-	if (super_user == 1 || same_uids == 1){}
-	//5. check DIR type (HOW?) AND not BUSY (HOW?) AND is empty:
-	int dir_type = mip->INODE.i_mode == 0x41ED;
-	int busy = 0;
-	int not_empty = (mip->INODE.i_links_count > 2);
-	//TODO go through its data block(s) to see whether it has any entries in addition to . and .
-	
+	remove_item(pathname, 1);
+}
+
+int is_dir_empty(MINODE *mip)
+{
+	int not_empty;
 	DIR *last = (DIR*)print_dir_entries(mip, 1);
 	
 	//printf("last = %x\n", last);
@@ -268,9 +242,40 @@ int my_rmdir(char *pathname){
 		not_empty = 0;
 	}
 	
-	/*
+	return not_empty;
+}
+
+int remove_item(char *pathname, int dir){
+	char backup_pathname[256];
+	strcpy(backup_pathname, pathname);
+	if(strcmp(pathname, ".") == 0 || strcmp(pathname, "..") == 0){
+		printf("You cannot delete this folder KC, nice try!\n");
+		return 0;
+	}
+	 
+	getchar();
+	char ptn_copy[256];
+	strcpy(ptn_copy, pathname);
+	printf("ptn_copy = %s\n", ptn_copy);
+	int ino  = my_getino(&dev, pathname); //2. get inumber of pathname: determine dev, then
+	if (ino == 0){
+		printf("%s does not exist\n", pathname);
+		return;
+	}
+	printf("got ino %d for pathname %s in my_rmdir()\n", ino, pathname);
+	MINODE *mip = iget(dev, ino); //3. get its minode[ ] pointer:
+	//4. check ownership super user : OK not super user: uid must match 
+	int super_user = 1; //TODO check this later
+	int same_uids = 1; //TODO check this later
+	if (super_user == 1 || same_uids == 1){}
+	int dir_type = mip->INODE.i_mode == 0x41ED; //5. check DIR type (HOW?) AND not BUSY (HOW?) AND is empty:
+	int busy = 0;
 	
-	not_empty = 0;
+	//TODO go through its data block(s) to see whether it has any entries in addition to . and .
+	
+	int not_empty = (mip->INODE.i_links_count > 2) && is_dir_empty(mip);
+	
+	/*
 	if (!dir_type || busy || not_empty){
 		printf("invalid, returning\n");
 		printf("dir_type = %d , imode = %x BUSY = %d not_empty = %d\n", dir_type, mip->INODE.i_mode, busy, not_empty);
@@ -278,10 +283,8 @@ int my_rmdir(char *pathname){
 		return -1;
 	}*/
 	
-	/*
-		6. ASSUME passed the above checks.
-     		Deallocate its block and inode
-	*/
+	//6. ASSUME passed the above checks. Deallocate its block and inode
+	
 	int i;
 	for (i = 0; i < 12; i++){
 		if (mip->INODE.i_block[i]==0)
@@ -291,14 +294,12 @@ int my_rmdir(char *pathname){
 	idealloc(mip->dev, mip->ino);
 	iput(mip); //(which clears mip->refCount = 0);
 
-	//	7. get parent DIR's ino and Minode (pointed by pip);
-	//search(INODE * inodePtr, char * directory_name)
 	getchar();
-	char *parent = dirname(backup_pathname);
+	char *parent = dirname(backup_pathname); 
 	
 	printf("parent in remove dir is %s\n", parent);
-        int pino = my_getino(&dev, parent);
-        MINODE *pip = iget(mip->dev, pino); 
+        int pino = my_getino(&dev, parent); 
+        MINODE *pip = iget(mip->dev, pino); //	7. get parent DIR's ino and Minode (pointed by pip);
 
 	printf("getting basename of %s\n", ptn_copy);
 
