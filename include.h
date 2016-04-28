@@ -3,6 +3,12 @@
 
 #include <time.h>
 #include "type.h"
+#include <stdio.h>
+
+#define RED "\033[1m\x1B[31m"
+#define CYN "\033[1m\x1B[36m"
+#define GRN "\033[1m\x1B[32m"
+#define WHT "\033[0m\x1B[37m"
 
 typedef unsigned int u32;
 

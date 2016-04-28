@@ -287,7 +287,24 @@ int ls_format(char * name, INODE* inode){
 	  strcpy(fin_atime, access_time);
 	  fin_atime[strlen(fin_atime)-1] = 0;
 	  
-	  printf("%s %s\n", fin_atime, name); 
+	  printf("%s ", fin_atime);
+	  //if it's a directory or executable make it a color
+	  if ((inode->i_mode & 0xF000) == 0x8000){
+		//printf(ANSI_COLOR_BLUE);
+		printf(GRN);
+	  }
+	  else if ((inode->i_mode & 0xF000) == 0x4000){
+		printf(CYN);
+	  }
+  	  else if ((inode->i_mode & 0xF000) == 0xA000){
+		//printf(ANSI_COLOR_RED);
+		printf(RED);
+	  }
+
+	  
+	  printf("%s\n", name); 
+
+	  printf(WHT);
 }
 
 
@@ -412,8 +429,8 @@ int main(int argc, char *argv[ ])
 
 	init();
 
-	char *function_names[] = {"touch", "chmod", "chown", "chgrp", "ls", "cd", "clear", "open", "mkdir", "creat", "pwd", "rmdir", "write", "cat", "parse", "link", "dr_name", "bs_name", "unlink", "cp", "close", "move", "symlink", "rm", 0};
-	int (*fptr[])() = {touch, my_chmod, chown, my_chgrp, ls2, cd, clear, laopen_file, mkdir_creat, mkdir_creat, pwd, my_rmdir, my_write, my_cat, parse, my_link, dr_name, bs_name, my_unlink, my_cp, my_close, mv, symlink, my_rm, 0};
+	char *function_names[] = {"touch", "chmod", "chown", "chgrp", "ls", "cd", "clear", "open", "mkdir", "creat", "pwd", "rmdir", "write", "cat", "parse", "link", "dr_name", "bs_name", "unlink", "cp", "close", "move", "symlink", "rm", "quit", 0};
+	int (*fptr[])() = {touch, my_chmod, chown, my_chgrp, ls2, cd, clear, laopen_file, mkdir_creat, mkdir_creat, pwd, my_rmdir, my_write, my_cat, parse, my_link, dr_name, bs_name, my_unlink, my_cp, my_close, mv, symlink, my_rm, quit, 0};
 
 	//test_write();
 
@@ -428,7 +445,7 @@ int main(int argc, char *argv[ ])
 		memset(pathname, 0, 64);
 		memset(parameter,0, 64);
 
-		printf("input command : ");
+		printf("user@computer:~%s$ ", totalPath());
 
 		fgets(line,128,stdin);
 		line[strlen(line)-1]=0;
