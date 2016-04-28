@@ -52,6 +52,7 @@ int mkdir_creat(char *pathname){
 	printf("child is %s\n", child);
 
 	mymkdir(pip, child, pino, dir);
+
 	if (dir) pip->INODE.i_links_count++; // inc parent inodes's link count by 1; 
 	else pip->INODE.i_links_count = 0;
 	
@@ -132,11 +133,8 @@ int mymkdir(MINODE *pip, char *name, int pino, int dir){
 	put_block(dev, bno, temp_buf);
 
 	/*Enter name entry into parent's directory by enter_name(pip, ino, name)*/
-
 	enter_name(pip, ino, name);
-	
 	//write data block to disk
-	
 }
 
 int ideal_len(int n){
@@ -265,7 +263,6 @@ int remove_item(char *pathname, int dir){
 	int same_uids = 1; //TODO check this later
 	if (super_user == 1 || same_uids == 1){}
 
-	
 	if (dir){
 		int dir_type = mip->INODE.i_mode == 0x41ED; //5. check DIR type (HOW?) AND not BUSY (HOW?) AND is empty:
 		int busy = 0;

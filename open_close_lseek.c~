@@ -142,71 +142,67 @@ int laopen_file(char *pathname, char* str_mode ){
 }
 
 /**
- * Confusion between processe's fd[] and the global array oft[]
- */
-	int laclose_file(int fd)
-	{
-	  printf("Entering Close_file\n");
-	  if(fd >= NOFT){
-		  printf("OFT index specified is out of range");
-		  return -1;
-	  }
-
-	  //2. verify running->fd[fd] is pointing at a OFT entry
-	  if(running -> fd[fd] == NULL)
-	  {
-		  printf("running fd is not actually pointing to a file directory...  ");
-		  return -1;
-	  }
-
-	  //3. The following code segments should be fairly obvious:
-
-	     OFT * oftp = running->fd[fd];
-	     running->fd[fd] = 0;
-	     oft[fd].refCount --;
-	     oftp->refCount--;
-
-	     if (oftp->refCount > 0){ return 0; }
-
-	     // last user of this OFT entry ==> dispose of the Minode[]
-	     MINODE * mip = oftp->inodeptr;
-	     iput(mip);
-	     running->fd[fd] = 0;
-
-
-
-	     return 0;
+* Confusion between processe's fd[] and the global array oft[]
+*/
+int laclose_file(int fd)
+{
+	printf("Entering Close_file\n");
+	if(fd >= NOFT){
+		printf("OFT index specified is out of range");
+		return -1;
 	}
+
+	//2. verify running->fd[fd] is pointing at a OFT entry
+	if(running -> fd[fd] == NULL)
+	{
+		printf("running fd is not actually pointing to a file directory...  ");
+		return -1;
+	}
+
+	//3. The following code segments should be fairly obvious:
+
+	OFT * oftp = running->fd[fd];
+	running->fd[fd] = 0;
+	oft[fd].refCount --;
+	oftp->refCount--;
+
+	if (oftp->refCount > 0){ return 0; }
+
+	// last user of this OFT entry ==> dispose of the Minode[]
+	MINODE * mip = oftp->inodeptr;
+	iput(mip);
+	running->fd[fd] = 0;
+
+	return 0;
+}
 
 
 
 /**
  * Read da Bitch
  */
- int laread(int fd,char buf[], int nbytes){
+int laread(int fd,char buf[], int nbytes){
+	if( running->fd[fd] == NULL || running->fd[fd]->refCount <=0 ){
+		int i =0;
+		for(i =0; i < 1024; i++){
+			buf[i] = 0;
+		}
+		printf("this file is not open.\n");
+		return 0;
+	}
 
+	// If this file is opened for write, please return yourself.
+	if(oft[fd].mode == 1 ){
+		printf("This file is open for write\n");
+		return 0;
+	}
 
-	 if( running->fd[fd] == NULL || running->fd[fd]->refCount <=0 ){
-		 int i =0;
-		 for(i =0; i < 1024; i++){
-			 buf[i] = 0;
-		 }
-		 printf("this file is not open.\n");
-		 return 0;
-	 }
+	//printf("This is my read\n" );
 
-	 // If this file is opened for write, please return yourself.
-	 if(oft[fd].mode == 1 ){
-		 printf("This file is open for write\n");
-		 return 0;
-	 }
+	//OFT * myfd = &oft[fd];
 
-	 //printf("This is my read\n" );
-
-	 //OFT * myfd = &oft[fd];
-
-	 return( myread(fd, buf, nbytes) );
- }
+	return( myread(fd, buf, nbytes) );
+}
 
 /* int lseek(int fd, int position)
  {
@@ -235,7 +231,7 @@ int indirect_block(MINODE *mip, int lbk)
 int db_indirect_block(MINODE *mip, int lbk){
 	char temp_buf[1024];
 	get_block(mip->dev, mip->INODE.i_block[13], temp_buf);
-	int blk;
+	int blk = temp_buf[lbk - 12];
 	return blk;
 }
   
@@ -266,7 +262,6 @@ int myread(int fd, char buf[], int nbytes){
              int blk =0;
              if (lbk < 12){                     // lbk is a direct block
                   blk = mip->INODE.i_block[lbk]; // map LOGICAL lbk to PHYSICAL blk
-
                   //printf("Calculated block: %d\n",blk );
              }
              else if (lbk >= 12 && lbk < 256 + 12) {
@@ -281,8 +276,6 @@ int myread(int fd, char buf[], int nbytes){
 
               /* get the data block into readbuf[BLKSIZE] */
               get_block(mip->dev, blk, readbuf);
-
-
 
               /* copy from startByte to buf[ ], at most remain bytes in this block */
               char *cp = readbuf + startByte;
@@ -483,6 +476,10 @@ int mywrite(int dest_fd, char buf[], int nbytes){
 					mip->INODE.i_size++;
 				if (nbytes <= 0) break;
 			}
+			int wt_ino    = mip->ino;
+			int wt_lbk    = (wt_ino - 1) / 8 + bg_inode_table;
+			int wt_offset = (wt_ino - 1) % 8;
+			
 		}
 		else{
 			while(remain > 0){
