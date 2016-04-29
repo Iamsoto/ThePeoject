@@ -174,6 +174,40 @@ int decFreeInodes(int dev)
 	put_block(dev, 2, buf);
 }
 
+int incFreeInodes(int dev)
+{
+	char buf[BLKSIZE];
+
+	// dec free inodes count in SUPER and GD
+	get_block(dev, 1, buf);
+	sp = (SUPER *)buf;
+	sp->s_free_inodes_count++;
+	put_block(dev, 1, buf);
+
+	get_block(dev, 2, buf);
+	gp = (GD *)buf;
+	gp->bg_free_inodes_count++;
+	put_block(dev, 2, buf);
+}
+
+int incFreeBlocks(int dev){
+	//decrement free blocks in super and gd
+	
+	char buf[BLKSIZE];
+
+	get_block(dev, 1, buf);
+	sp = (SUPER *)buf;
+	sp->s_free_blocks_count++;
+	put_block(dev, 1, buf);
+	
+	get_block(dev, 2, buf);
+	gp = (GD *)buf;
+	gp->bg_free_blocks_count++;
+	put_block(dev, 2, buf);
+
+	nblocks--;
+}
+
 int findmyname(MINODE *parent, int myino, char *myname) 
 {
 	char *parent_name = parent->name;

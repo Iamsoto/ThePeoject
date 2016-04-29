@@ -3,7 +3,7 @@
 
 //Truncates a file
 //TODO: All of it...
-MINODE* truncate(MINODE *mip)
+MINODE* my_truncate(MINODE *mip)
 {
 	/*
 	1. release mip->INODE's data blocks;
@@ -45,6 +45,11 @@ int laopen_file(char *pathname, char* str_mode ){
 
 	int ino = my_getino(&dev, pathname);
 	MINODE *mip = iget(dev,ino);
+
+	if(mip->ino ==0){
+		printf("\n \n Pathname not detected!! \n");
+		return 0;
+	}
 	printf("Obtained inode of inum:%d\n", mip->ino);
 
 	// Return if inode is a directory
@@ -59,23 +64,24 @@ int laopen_file(char *pathname, char* str_mode ){
 	* TODO: Is this right?
 	Check whether the file is ALREADY opened with INCOMPATIBLE mode:
 	   If it's already opened for W, RW, APPEND : reject.
-	   (that is, only multiple R are OK)
+
 	*/
-	/*	if(&oft[0] == NULL){
-	printf(" \n I am successful \n");
-	}
-	//printf("")
-	printf("This is the oft[0] %d\n", oft[0].inodeptr->ino );
+
 	int k = 0;
-	for (k = 0; k < NOFT; k++){
-	printf("I'm in loop mofuccka\n");
-	if( (&oft[k] != NULL)  && (oft[k].inodeptr->ino == mip->ino)){
-		if(oft[k].mode != 0){
-			printf("File is already open with an incompatible mode \n" );
-			return 0;
+	for (k = 0; k < NFD; k++){
+		OFT * file_pointer = 0;
+		if( (running->fd[k] != 0)  && (running->fd[k]->inodeptr->ino == mip->ino)){
+			if(running->fd[k]->mode != 0){
+				printf("File is already open with an incompatible mode \n" );
+				return 0;
+			}else{
+				running->fd[k]->refCount ++;
+				printf("File already opened, incrememnting ref_ counter\n\n");
+				return 0;
+			}
 		}
+
 	}
-	}*/
 
 	// 5. allocate a FREE OpenFileTable (OFT) and fill in values:
 	OFT *oftp = (OFT *)malloc(sizeof(OFT));
@@ -91,7 +97,7 @@ int laopen_file(char *pathname, char* str_mode ){
 		 case 0 : oftp->offset = 0;     // R: offset = 0
 			  break;
 		 case 1 : 
-		 	  truncate(mip);        // W: truncate file to 0 size
+		 	  my_truncate(mip);        // W: truncate file to 0 size
 			  oftp->offset = 0;
 			  break;
 		 case 2 : oftp->offset = 0;     // RW: do NOT truncate file
@@ -99,7 +105,7 @@ int laopen_file(char *pathname, char* str_mode ){
 		 case 3 : oftp->offset =  mip->INODE.i_size;  // APPEND mode
 			  break;
 		 default: printf("invalid mode\n");
-		  return(-1);
+		  return(0);
 	}
 
 	// Also be sure to allocate in extern variable
@@ -118,9 +124,9 @@ int laopen_file(char *pathname, char* str_mode ){
 	// Note the Proc has a fd table
 	int i = 0;
 	for(i =0; i < NFD; i++){
-	 if( running -> fd[i] == NULL ){
+	 if( running -> fd[i] == NULL || running -> fd[i]->refCount < 1){
 		 running -> fd[i] = oftp;
-		 printf("allocated fd[%d] \n", i );
+		 printf(" \n allocated fd[%d] \n", i );
 		 break;
 	 }
 	}
@@ -136,77 +142,77 @@ int laopen_file(char *pathname, char* str_mode ){
 	printf("Here's the inode's updated time: %d\n", oftp->inodeptr->INODE.i_atime = time(0L));
 
 	mip->dirty = 1;
+	iput(mip);
 
 	// i is the i'th index to OFT[]
 	return i;
 }
 
 /**
- * Confusion between processe's fd[] and the global array oft[]
- */
-	int laclose_file(char* fd)
-	{
-	  printf("Entering Close_file\n");
-	  if(fd >= NOFT){
-		  printf("OFT index specified is out of range");
-		  return -1;
-	  }
 
-	  //2. verify running->fd[fd] is pointing at a OFT entry
-	  if(running -> fd[fd] == NULL)
-	  {
-		  printf("running fd is not actually pointing to a file directory...  ");
-		  return -1;
-	  }
-
-	  //3. The following code segments should be fairly obvious:
-
-	     OFT * oftp = running->fd[fd];
-	     running->fd[fd] = 0;
-	     oft[fd].refCount --;
-	     oftp->refCount--;
-
-	     if (oftp->refCount > 0){ return 0; }
-
-	     // last user of this OFT entry ==> dispose of the Minode[]
-	     MINODE * mip = oftp->inodeptr;
-	     iput(mip);
-	     running->fd[fd] = 0;
-
-
-
-	     return 0;
+* Confusion between processe's fd[] and the global array oft[]
+*/
+int laclose_file(int fd)
+{
+	printf("Entering Close_file\n");
+	if(fd >= NFD){
+		printf("OFT index specified is out of range");
+		return -1;
 	}
+
+
+	//2. verify running->fd[fd] is pointing at a OFT entry
+	if(running -> fd[fd] == NULL)
+	{
+		printf("running fd is not actually pointing to a file directory...  ");
+		return -1;
+	}
+
+	//3. The following code segments should be fairly obvious:
+
+	OFT * oftp = running->fd[fd];
+	running->fd[fd] = 0;
+	oft[fd].refCount --;
+	oftp->refCount--;
+
+	if (oftp->refCount > 0){ return 0; }
+
+	// last user of this OFT entry ==> dispose of the Minode[]
+	MINODE * mip = oftp->inodeptr;
+	iput(mip);
+	printf("Closing file pointer at: %d\n", fd);
+
+
+	return 0;
+}
 
 
 
 /**
  * Read da Bitch
  */
- int laread(int fd,char buf[], int nbytes){
+int laread(int fd,char buf[], int nbytes){
+	if( running->fd[fd] == NULL || running->fd[fd]->refCount <=0 ){
+		int i =0;
+		for(i =0; i < 1024; i++){
+			buf[i] = 0;
+		}
+		printf("this file is not open.\n");
+		return 0;
+	}
 
+	// If this file is opened for write, please return yourself.
+	if(running->fd[fd]->mode == 1 ){
+		printf("This file is open for write\n");
+		return 0;
+	}
 
-	 if( running->fd[fd] == NULL || running->fd[fd]->refCount <=0 ){
-		 int i =0;
-		 for(i =0; i < 1024; i++){
-			 buf[i] = 0;
-		 }
-		 printf("this file is not open.\n");
-		 return 0;
-	 }
+	//printf("This is my read\n" );
 
-	 // If this file is opened for write, please return yourself.
-	 if(oft[fd].mode == 1 ){
-		 printf("This file is open for write\n");
-		 return 0;
-	 }
+	//OFT * myfd = &oft[fd];
 
-	 //printf("This is my read\n" );
-
-	 //OFT * myfd = &oft[fd];
-
-	 return( myread(fd, buf, nbytes) );
- }
+	return( myread(fd, buf, nbytes) );
+}
 
 /* int lseek(int fd, int position)
  {
@@ -221,6 +227,24 @@ int laopen_file(char *pathname, char* str_mode ){
   * TODO:
   * 	Recall that offset does not work because L_seek and truncate do not really work
   */
+  
+int indirect_block(MINODE *mip, int lbk)
+{
+	char temp_buf[1024]; //so that we don't change buf
+	get_block(mip->dev, mip->INODE.i_block[12], temp_buf); //load the indirect blocks into 
+	//temp buf
+	int blk = temp_buf[lbk - 12]; //since we start at the indirect blocks
+	//we must take into account the 12 blocks that came before it
+	return blk;
+}
+
+int db_indirect_block(MINODE *mip, int lbk){
+	char temp_buf[1024];
+	get_block(mip->dev, mip->INODE.i_block[13], temp_buf);
+	int blk = temp_buf[lbk - 12];
+	return blk;
+}
+  
 int myread(int fd, char buf[], int nbytes){
     // What is file size??
 
@@ -248,11 +272,13 @@ int myread(int fd, char buf[], int nbytes){
              int blk =0;
              if (lbk < 12){                     // lbk is a direct block
                   blk = mip->INODE.i_block[lbk]; // map LOGICAL lbk to PHYSICAL blk
-
                   //printf("Calculated block: %d\n",blk );
              }
              else if (lbk >= 12 && lbk < 256 + 12) {
                    //  TODO: indirect blocks
+                   printf("hit indirect blocks\n");
+                   getchar();
+                   blk = indirect_block(mip, lbk);
              }
              else{
                    //  TODO: double indirect blocks
@@ -260,8 +286,6 @@ int myread(int fd, char buf[], int nbytes){
 
               /* get the data block into readbuf[BLKSIZE] */
               get_block(mip->dev, blk, readbuf);
-
-
 
               /* copy from startByte to buf[ ], at most remain bytes in this block */
               char *cp = readbuf + startByte;
@@ -335,7 +359,7 @@ int my_cat(char *pathname){
 
 //	  printf("The fd =%d\n", fd);
 
-	  while( n = laread(fd, mybuf, 1024)){
+	  while( n = laread(fd, mybuf, 1024) ){
 
 	//	  printf("I'm atline 327\n");
 	       mybuf[n] = 0;             // as a null terminated string
@@ -472,7 +496,7 @@ int mywrite(int dest_fd, char buf[], int nbytes){
 					mip->INODE.i_size++;
 				}
 				if (nbytes <= 0) break;
-			}
+			}		
 		}
 		else{
 			while(remain > 0){
@@ -502,34 +526,49 @@ int mywrite(int dest_fd, char buf[], int nbytes){
 /*
  * The lseek function
  */
-int my_lseek(int fd, int position){
+int my_lseek(char *s_fd, char *s_position){
+	int fd = atoi(s_fd);
+	int position = atoi(s_position);
 	OFT *file_pointer = running->fd[fd];
-	//if(position <= )
+	if(position <0 || position > file_pointer->inodeptr->INODE.i_size){
+		printf("Invalid position entered \n");
+		return 0;
+	}
+
+	file_pointer->offset = position;
+	printf("file offset successful \n");
+	return 0;
 }
 
 
 /**
  * print all the open files
  */
-int pfd(){
-	printf("* * * * *pfd:* * * * ");
-	printf("Open files: \n");
+int pfd(char * pathname){
+	printf("* * * * *pfd:* * * * \n");
+	printf(" Open files: \n");
+	OFT * fd =0;
 	int i =0;
-	for(i =0; i<10; i++){
-		OFT * fd = running->fd[i];
-		if(fd->refCount >1){
-			printf("\nOpen file fd: %d\n", i);
-			char the_mode[10] = { 0 };
+	char the_mode[200] = { 0 };
+	for(i =0; i<NFD; i++){
+		fd = running->fd[i];
+		//running->fd
+		if (fd == 0) continue;
+
+		if( fd->refCount >=1){
+			printf("\n  Open file fd: %d\n", i);
+			printf("fd\tmode\toffset\tINODE\n");
+			printf("__________________\n");
 			if(fd->mode == 0){
 				strcpy(the_mode, "READ");
 			}
 			else {
 				strcpy(the_mode,"WRITE");
 			}
-			printf("Open file mode: %s \n ", the_mode);
-			printf("Open file inode: %d\n", fd->inodeptr->ino);
+			printf("%d %d %.4d [%d, %d]\n", i, fd->mode, fd->offset, fd->inodeptr->dev, fd->inodeptr->ino);
 		}
 	}
+	printf("\n");
 	return 0;
 }
 
